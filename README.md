@@ -1,7 +1,7 @@
 # STAND
 ---
 ## Paper code and data
-
+https://github.com/goodstudy255/STAND-code/blob/main/README.md
 This is the code for the WWW 2024 underreview paper: [Short-Term Interests And Next Behavior Reconstruction with Diffusion Model Retrieval](Paper 87). We have implemented our methods in **Tensorflow**.
 
 These are two datasets we used in our paper， Kuairand and ml-1m respectively. After download them, you can correct the path into your own in `dataset_proess.py` and `ml_1m_process.py` respectively.
@@ -23,7 +23,7 @@ For example: `python3 cmain_multi_graph.py` and `python3 cmain.py`
 . Python 3.7 \
 . Tensorflow 1.13.1 \
 . tensorboar 1.13.1 \
-. scipy 1.7.3 \
+. scipy 1.7.3 
 
 ---
 
