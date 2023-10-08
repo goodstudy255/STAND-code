@@ -1,4 +1,4 @@
-# STAMP
+# STAND
 ---
 ## Paper code and data
 
