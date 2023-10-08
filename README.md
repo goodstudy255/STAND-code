@@ -21,9 +21,9 @@ For example: `python3 cmain_multi_graph.py` and `python3 cmain.py`
 ## Requirements
 
 . Python 3.7 \
-. Tensorflow 1.13.1
-. tensorboar 1.13.1
-. scipy 1.7.3
+. Tensorflow 1.13.1 \
+. tensorboar 1.13.1 \
+. scipy 1.7.3 \
 
 ---
 
