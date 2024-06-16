@@ -5,10 +5,8 @@ import pandas as pd
 import numpy as np
 from data_prepare.entity.samplepack import Samplepack
 from data_prepare.load_dict import load_random,load_random_k,load_random_tag
-from data_prepare.cikm16data_read import load_data2
 from data_prepare.kuairand_read_txt import load_data_k
 from data_prepare.ml_1m_read_text import load_data_m
-from data_prepare.rsyc15data_read_p import load_data_p
 from util.Config import read_conf
 from util.FileDumpLoad import dump_file, load_file
 from util.Randomer import Randomer
