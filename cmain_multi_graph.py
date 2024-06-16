@@ -16,31 +16,13 @@ import sys
 import time
 import datetime
 import os
-# the data path.
-
-root_path = '//Users/hanzhexin/Desktop/snack_model_config'
-project_name = '/STAMP'
-
-rsc15_train = root_path + project_name +'/datas/data/rsc15_train_full.txt'
-rsc15_test = root_path + project_name +'/datas/data/rsc15_test.txt'
-mid_rsc15_train_data = "rsc15_train.data"
-mid_rsc15_test_data = "rsc15_test.data"
-mid_rsc15_emb_dict = "rsc15_emb_dict.data"
-mid_rsc15_4_emb_dict = "rsc15_4_emb_dict.data"
-mid_rsc15_64_emb_dict = "rsc15_64_emb_dict.data"
-
-
-cikm16_train = root_path + project_name +'/datas/cikm16/cmki16_train_full.txt'
-cikm16_test = root_path + project_name +'/datas/cikm16/cmki16_test.txt'
-mid_cikm16_emb_dict = "cikm16_emb_dict.data"
-
 
 # _new
-kuairand_train = '/home/hanzhexin03/STAND-code-main/kuairand/kuairand-train_0.txt'
-kuairand_test = '/home/hanzhexin03/STAND-code-main/kuairand/kuairand-test_0.txt'
+kuairand_train = 'kuairand/kuairand-train_0.txt'
+kuairand_test = 'kuairand/kuairand-test_0.txt'
 
-ml_1m_train = '/home/hanzhexin03/STAND-code-main/ml-1m/ml-1m-train_0.txt'
-ml_1m_test = '/home/hanzhexin03/STAND-code-main/ml-1m/ml-1m-test_0.txt'
+ml_1m_train = 'ml-1m/ml-1m-train_0.txt'
+ml_1m_test = 'ml-1m-test_0.txt'
 
 def load_tt_datas(config={}, reload=True):
     '''
@@ -68,7 +50,6 @@ def load_tt_datas(config={}, reload=True):
             config['item2idx'] = item2idx
 
             path = 'datas/mid_data'
-            dump_file([emb_dict_id, path+mid_rsc15_4_emb_dict])
             print("-----")
         
 
@@ -87,50 +68,8 @@ def load_tt_datas(config={}, reload=True):
             config['item2idx'] = item2idx
 
             path = 'datas/mid_data'
-            dump_file([emb_dict_id, path+mid_rsc15_4_emb_dict])
-            print("-----")
 
 
-        if config['dataset'] == 'rsc15_4':
-            train_data, test_data, item2idx, n_items = load_data_p(
-                rsc15_train,
-                rsc15_test,
-                pro = 4
-            )  
-
-            config["n_items"] = n_items-1
-            emb_dict = load_random(item2idx,edim=config['hidden_size'], init_std=config['emb_stddev'])
-            config['pre_embedding'] = emb_dict
-            path = 'datas/mid_data'
-            dump_file([emb_dict, path+mid_rsc15_4_emb_dict])
-            print("-----")
-
-        if config['dataset'] == 'rsc15_64':
-            train_data, test_data, item2idx, n_items = load_data_p(
-                rsc15_train,
-                rsc15_test,
-                pro = 64
-            )
-
-            config["n_items"] = n_items-1
-            emb_dict = load_random(item2idx, edim=config['hidden_size'], init_std=config['emb_stddev'])
-            config['pre_embedding'] = emb_dict
-            path = 'datas/mid_data'
-            dump_file([emb_dict, path + mid_rsc15_64_emb_dict])
-            print("-----")
-
-        if config['dataset'] == 'cikm16':
-            train_data, test_data, item2idx, n_items = load_data2(
-                cikm16_train,
-                cikm16_test,
-                class_num=config['class_num']
-            )
-            config["n_items"] = n_items-1
-            emb_dict = load_random(item2idx,edim=config['hidden_size'], init_std=config['emb_stddev'])
-            config['pre_embedding'] = emb_dict
-            path = 'datas/mid_data'
-            dump_file([emb_dict, path+mid_cikm16_emb_dict])
-            print("-----")
 
     else:
         print ("not reload the datasets.")
@@ -153,7 +92,6 @@ def load_tt_datas(config={}, reload=True):
             config['item2tag'] = item2tag
 
             path = 'datas/mid_data'
-            dump_file([emb_dict_id,path+mid_rsc15_4_emb_dict])
             print("-----")
 
         if config['dataset'] == 'ml_1m':
@@ -171,47 +109,6 @@ def load_tt_datas(config={}, reload=True):
             config['item2idx'] = item2idx
 
             path = 'datas/mid_data'
-            dump_file([emb_dict_id, path+mid_rsc15_4_emb_dict])
-            print("-----")
-
-        if config['dataset'] == 'rsc15_4':
-            train_data, test_data, item2idx, n_items = load_data_p(
-                rsc15_train,
-                rsc15_test,
-                pro=4
-            )
-
-            config["n_items"] = n_items-1
-            path = 'datas/mid_data'
-            emb_dict = load_file(path + mid_rsc15_4_emb_dict)
-            config['pre_embedding'] = emb_dict[0]
-
-            print("-----")
-
-        if config['dataset'] == 'rsc15_64':
-            train_data, test_data, item2idx, n_items = load_data_p(
-                rsc15_train,
-                rsc15_test,
-                pro=64
-            )
-
-            config["n_items"] = n_items-1
-            path = 'datas/mid_data'
-            emb_dict = load_file(path+mid_rsc15_64_emb_dict)
-            config['pre_embedding'] = emb_dict[0]
-
-            print("-----")
-
-        if config['dataset'] == 'cikm16':
-            train_data, test_data, item2idx, n_items = load_data2(
-                cikm16_train,
-                cikm16_test,
-                class_num=config['class_num']
-            )
-            config["n_items"] = n_items-1
-            path = 'datas/mid_data'
-            emb_dict = load_file(path + mid_cikm16_emb_dict)
-            config['pre_embedding'] = emb_dict[0]
             print("-----")
 
     return train_data, test_data
@@ -441,10 +338,7 @@ def main(options, modelconf="config/model.conf"):
                 max_mrr.append(0.0)
             for e in range(epoch):
                 if is_train:
-                    start = time.time()
-                    if dataset == "cikm16":
-                        train_model.train(train_sess, train_data, test_data,  threshold_acc=config['cikm_threshold_acc'])
-                    elif dataset == 'kuairand' or dataset == 'ml_1m':
+                    if dataset == 'kuairand' or dataset == 'ml_1m':
                         train_model.train(train_sess,e, train_data, merged, writer,  threshold_acc=config['kuairand_threshold_acc'])
                     else:
                         train_model.train(train_sess, train_data, test_data, threshold_acc=config['recsys_threshold_acc'])
