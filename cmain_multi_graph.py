@@ -36,11 +36,11 @@ mid_cikm16_emb_dict = "cikm16_emb_dict.data"
 
 
 # _new
-kuairand_train = r'/Users/hanzhexin/Desktop/STAMP/kuairand_train_new/kuairand-train_0.txt'
-kuairand_test = r'/Users/hanzhexin/Desktop/STAMP/kuairand_test_new/kuairand-test_0.txt'
+kuairand_train = '/home/hanzhexin03/STAND-code-main/kuairand/kuairand-train_0.txt'
+kuairand_test = '/home/hanzhexin03/STAND-code-main/kuairand/kuairand-test_0.txt'
 
-ml_1m_train = r'/Users/hanzhexin/Desktop/STAMP/ml-1m/ml-1m-train_0.txt'
-ml_1m_test  = r'/Users/hanzhexin/Desktop/STAMP/ml-1m/ml-1m-test_0.txt'
+ml_1m_train = '/home/hanzhexin03/STAND-code-main/ml-1m/ml-1m-train_0.txt'
+ml_1m_test = '/home/hanzhexin03/STAND-code-main/ml-1m/ml-1m-test_0.txt'
 
 def load_tt_datas(config={}, reload=True):
     '''
@@ -251,7 +251,7 @@ def option_parse():
         action='store',
         type='string',
         dest="model",
-        default='stamp_kuairand'
+        default='stand_ml_1m'
     )
     parser.add_option(
         "-d",
@@ -313,7 +313,7 @@ def option_parse():
         action='store',
         type='int',
         dest="epoch",
-        default=50
+        default=1
     )
     (option, args) = parser.parse_args()
     return option
@@ -347,7 +347,7 @@ def main(options, modelconf="config/model.conf"):
     train_data, test_data = load_tt_datas(config, reload)
     module = __import__(module, fromlist=True)
 
-    train_model_save_path = 'save_model/stamp_new/save1/ml_1m.ckpt-kuairand'
+    train_model_save_path = 'save_model/stamp_new/save3/ml_1m.ckpt-kuairand'
 
     # setup randomer
 
@@ -356,8 +356,8 @@ def main(options, modelconf="config/model.conf"):
     if not is_train and test_data!=None:
         max_recall = []
         max_mrr = []
-        # cut_off = [1000,5000,10000]
-        cut_off = [50,200,500]
+        cut_off = [1,2,5,20,50]
+        # cut_off = [5,10,50,100,200]
         epoch_num = 0
         for i in range(len(cut_off)):
             max_recall.append(0.0)
@@ -406,6 +406,27 @@ def main(options, modelconf="config/model.conf"):
             test_model.build_test_model()
         with tf.Session(graph =train_graph) as train_sess:
             train_sess.run(tf.global_variables_initializer())
+
+            Total_params = 0 
+            Trainable_params = 0
+            NonTrainable_params = 0
+
+            # 遍历tf.global_variables()返回的全局变量列表
+            for var in tf.global_variables():
+                shape = var.shape # 获取每个变量的shape，其类型为'tensorflow.python.framework.tensor_shape.TensorShape'
+                array = np.asarray([dim.value for dim in shape]) # 转换为numpy数组，方便后续计算
+                mulValue = np.prod(array) # 使用numpy prod接口计算数组所有元素之积
+
+                Total_params += mulValue # 总参数量
+                if var.trainable:
+                    Trainable_params += mulValue # 可训练参数量
+                else:
+                    NonTrainable_params += mulValue # 非可训练参数量
+
+            print(f'Total params: {Total_params}')
+            print(f'Trainable params: {Trainable_params}')
+            print(f'Non-trainable params: {NonTrainable_params}')
+
             merged = tf.summary.merge_all() 
             log_path = "loss_log/"+str(datetime.datetime.now())
             if not os.path.exists(log_path):
@@ -413,7 +434,7 @@ def main(options, modelconf="config/model.conf"):
             writer = tf.summary.FileWriter(log_path, train_sess.graph)
             max_recall = []
             max_mrr = []
-            cut_off = [50,200,500]  #[1000,5000, 10000]
+            cut_off = [1,2,5,20,50]  #[1,2,5,20,50] [5,10,50,100,200]
             epoch_num = 0
             for i in range(len(cut_off)):
                 max_recall.append(0.0)

@@ -14,7 +14,7 @@ from util.FileDumpLoad import dump_file, load_file
 from util.Randomer import Randomer
 # the data path.
 
-root_path = '//Users/hanzhexin/Desktop/snack_model_config'
+root_path = '/home/hanzhexin03/STAND-code-main'
 project_name = '/STAMP'
 
 # the pretreatment data path.
@@ -38,11 +38,11 @@ kuairand_video_data = r'/Users/hanzhexin/Desktop/STAMP/KuaiRand-1K/data/video_fe
 # kuairand_train = r'./kuairand-train-merge.txt'
 # kuairand_test = r'./kuairand-test-merge.txt'  _new
 
-kuairand_train = r'/Users/hanzhexin/Desktop/STAMP/kuairand_train_new/kuairand-train_0.txt'
-kuairand_test = r'/Users/hanzhexin/Desktop/STAMP/kuairand_test_new/kuairand-test_0.txt'
+kuairand_train = '/home/hanzhexin03/STAND-code-main/kuairand/kuairand-train_0.txt'
+kuairand_test = '/home/hanzhexin03/STAND-code-main/kuairand/kuairand-test_0.txt'
 
-ml_1m_train = '/Users/hanzhexin/Desktop/STAMP/ml-1m/ml-1m-train_0.txt'
-ml_1m_test = '/Users/hanzhexin/Desktop/STAMP/ml-1m/ml-1m-test_0.txt'
+ml_1m_train = '/home/hanzhexin03/STAND-code-main/ml-1m/ml-1m-train_0.txt'
+ml_1m_test = '/home/hanzhexin03/STAND-code-main/ml-1m/ml-1m-test_0.txt'
 
 
 
@@ -278,7 +278,7 @@ def option_parse():
         action='store',
         type='string',
         dest="model",
-        default='stamp_kuairand'
+        default='stosa_ml_1m'
     )
     parser.add_option(
         "-d",
@@ -286,7 +286,7 @@ def option_parse():
         action='store',
         type='string',
         dest="dataset",
-        default='kuairand'
+        default='ml_1m'
     )
     parser.add_option(
         "-r",
@@ -324,7 +324,7 @@ def option_parse():
         action='store',
         type='string',
         dest="model_path",
-        default='./save_model'
+        default='./save_model/caser_model'
     )
     parser.add_option(
         "-i",
@@ -340,7 +340,7 @@ def option_parse():
         action='store',
         type='int',
         dest="epoch",
-        default=50
+        default=1
     )
     (option, args) = parser.parse_args()
     return option
@@ -383,12 +383,34 @@ def main(options, modelconf="config/model.conf"):
         model = getattr(module, obj)(config)
         model.build_model()
         if is_save or not is_train:
-            saver = tf.train.Saver(max_to_keep=30)
+            saver = tf.train.Saver() #max_to_keep=30
         else:
             saver = None
         # run
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
+
+            Total_params = 0 
+            Trainable_params = 0
+            NonTrainable_params = 0
+
+            # 遍历tf.global_variables()返回的全局变量列表
+            for var in tf.global_variables():
+                shape = var.shape # 获取每个变量的shape，其类型为'tensorflow.python.framework.tensor_shape.TensorShape'
+                array = np.asarray([dim.value for dim in shape]) # 转换为numpy数组，方便后续计算
+                mulValue = np.prod(array) # 使用numpy prod接口计算数组所有元素之积
+
+                Total_params += mulValue # 总参数量
+                if var.trainable:
+                    Trainable_params += mulValue # 可训练参数量
+                else:
+                    NonTrainable_params += mulValue # 非可训练参数量
+
+            print(f'Total params: {Total_params}')
+            print(f'Trainable params: {Trainable_params}')
+            print(f'Non-trainable params: {NonTrainable_params}')
+
+
             merged = tf.summary.merge_all() 
             writer = tf.summary.FileWriter("loss_log/", sess.graph)
             if is_train:
@@ -396,7 +418,8 @@ def main(options, modelconf="config/model.conf"):
                 if dataset == "cikm16":
                     model.train(sess, train_data, test_data, saver, threshold_acc=config['cikm_threshold_acc'])
                 elif dataset == 'kuairand' or dataset == 'ml_1m':
-                    model.train(sess, train_data, test_data,merged,writer, saver, threshold_acc=config['kuairand_threshold_acc'])
+                    model.train(sess, train_data, test_data,merged,writer, saver)
+                    saver.save(sess, model_path)
                 else:
                     model.train(sess, train_data, test_data, saver, threshold_acc=config['recsys_threshold_acc'])
                 # if dataset == "rsc15":
