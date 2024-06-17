@@ -119,14 +119,6 @@ def option_parse():
         default='t2diff_ml_1m'
     )
     parser.add_option(
-        "-d",
-        "--dataset",
-        action='store',
-        type='string',
-        dest="dataset",
-        default='ml_1m'
-    )
-    parser.add_option(
         "-r",
         "--reload",
         action='store_true',
@@ -148,21 +140,12 @@ def option_parse():
         dest="model_path",
         default='./save_model'
     )
-    parser.add_option(
-        "-e",
-        "--epoch",
-        action='store',
-        type='int',
-        dest="epoch",
-        default=10
-    )
     (option, args) = parser.parse_args()
     return option
 
 
 def main(options, modelconf="config/model.conf"):
     model = options.model
-    dataset = options.dataset
     reload = options.reload
     is_train = not options.not_train
     model_path = options.model_path

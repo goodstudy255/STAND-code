@@ -20,9 +20,9 @@ Due to varying tag counts associated with each data entry in the 'KuaiRand' and 
 ## Usage
 The path of configuration file is `config`, you can modify the model path in `model.conf` and modify the relevant parmaters in `nn_param.conf`
 
-As our model is in two different modes at training and testing phase, so you need to run `cmain_multi_graph.py` to train our model. As for the other comparison models, you can run the file`cmain.py` to train the model. Both the model use the same configuration file.
+As our model is in two different modes at training and testing phase, so you need to run `cmain_multi_graph.py` to train the model.
 
-For example: `python3 cmain_multi_graph.py` and `python3 cmain.py`
+For example: `python3 cmain_multi_graph.py --model t2diff_ml_1m`
 
 
 ---
