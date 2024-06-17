@@ -328,7 +328,7 @@ def main(options, modelconf="config/model.conf"):
             writer = tf.summary.FileWriter(log_path, train_sess.graph)
             max_recall = []
             max_mrr = []
-            cut_off = [1,2,5,20,50]  #[1,2,5,20,50] [5,10,50,100,200]
+            cut_off = [1,2,5,20,50]
             epoch_num = 0
             for i in range(len(cut_off)):
                 max_recall.append(0.0)

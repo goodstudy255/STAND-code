@@ -3,13 +3,8 @@ import numpy as np
 import tensorflow as tf
 import time
 from basic_layer.NN_adam import NN
-from util.Printer import TIPrint
 from util.batcher.equal_len.batcher_p import batcher
 from util.AccCalculater import cau_recall_mrr_org_list
-from util.AccCalculater import cau_samples_recall_mrr
-from util.Pooler import pooler
-from basic_layer.FwNn3AttLayer import FwNnAttLayer
-from util.FileDumpLoad import dump_file
 import sys
 import math
 
