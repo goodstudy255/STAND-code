@@ -41,7 +41,7 @@ with open(cate_path,'r',encoding='ISO-8859-1') as f:
                 id+=1
             cate_list.append(cate_dict[cate])
         movie_id = line[0]
-        item2cate[movie_id] = cate_list #cate_dict[cate]
+        item2cate[movie_id] = cate_list 
 
 data = open('./ml-1m/data.txt', 'w+')
 user_dict = {}

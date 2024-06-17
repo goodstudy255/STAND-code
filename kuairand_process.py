@@ -50,10 +50,6 @@ for uid_, vid_ in tqdm(zip(list(stack_data.user_id), list(stack_data.video_id)),
         user_list.append(uid_)
         item_list.append(vid_)
 
-with open('kuairand_ui_pairs_sorted_by_timestamp.tsv', 'w+') as f:
-    for uid_, vid_ in zip(user_list, item_list):
-        f.write('{}\t{}\n'.format(uid_, vid_))
-
 import json
 data = open('./kuairand/data.txt', 'w+')
 user_seq = defaultdict(list)
