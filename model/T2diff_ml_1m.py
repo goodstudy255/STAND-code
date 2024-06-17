@@ -13,8 +13,6 @@ from util.FileDumpLoad import dump_file
 import sys
 import math
 
-# 相较于v5，提升了噪声的影响力，修复训练选取t步时不随机的问题
-
 class T2diff(NN):
     """
     The memory network with context attention.
@@ -69,10 +67,8 @@ class T2diff(NN):
         self.sequence_length = None
         self.reverse_length = None
         self.aspect_length = None
-        # the label input. (on-hot, the true label is 1.)
         self.lab_input = None
-        self.embe_dict = None  # the embedding dictionary.
-        # the optimize set.
+        self.embe_dict = None  
         self.global_step = None  # the step counter.
         self.loss = None  # the loss of one batch evaluate.
         self.lr = None  # the learning rate.
@@ -82,7 +78,6 @@ class T2diff(NN):
         self.pe_mask = None
         # the predict.
         self.pred = None
-        # the params need to be trained.
         self.params = None
         self.train_flag = True
         
@@ -121,13 +116,9 @@ class T2diff(NN):
         return tf.get_variable(var_name, shape=(input_dim, output_dim), initializer=initializer)
 
     def unet(self,keys,  num_layers=3, out_dims=4, scope="unet"):
-        """
-        对输入的action_list长度敏感, 需要确认corp_size都为整数。
-        """
         with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
             num_conv_per_layer = 1
             num_of_steps= 50
-            # print("unet mask shape:", key_masks.get_shape())
 
             # compute padding & corp size
             corp_size = [num_of_steps + num_conv_per_layer*2]
@@ -139,7 +130,6 @@ class T2diff(NN):
                 filters = [out_dims]
             for _ in range(num_layers-1):
                 filters.append(filters[-1]*2)
-            #前后拼接一部分镜像序列
             padding_size = int((full_size[0] - num_of_steps) / 2)
             inputs = tf.concat([tf.reverse(keys[:, :padding_size, :], axis=[1]),keys, tf.reverse(keys[:, -padding_size:, :], axis=[1])], axis=1)
             # top down
