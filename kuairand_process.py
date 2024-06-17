@@ -7,7 +7,7 @@ import pandas as pd
 from collections import Counter
 import matplotlib.pyplot as plt
 
-""" if not os.path.exists('./kuairand'):
+if not os.path.exists('./kuairand'):
     os.mkdir('./kuairand')
 if not os.path.exists('./kuairand_train'):
     os.mkdir('./kuairand_train')
@@ -84,49 +84,49 @@ for uid_ in user_seq:
         cate_hist.append(itemidx2cate[str(item_dict[vid_])])
 cate_cnter = Counter(cate_hist)
 print(cate_cnter)
-json.dump(itemidx2cate, open('./kuairand/item2cate.json', 'w'))   """ 
+json.dump(itemidx2cate, open('./kuairand/item2cate.json', 'w')) 
     
 
-# import random
-# data = open('./kuairand/data.txt')
-# user_seq = defaultdict(list)
-# item_seq = defaultdict(set)
-# aver_seq_num = 0
-# for data_i in data:
-#     u, i = data_i.strip('\n').split()
-#     user_seq[u].append(i)
-#     item_seq[i].add(u)
-# json.dump(user_seq, open('./kuairand/data.json', 'w'))   
+import random
+data = open('./kuairand/data.txt')
+user_seq = defaultdict(list)
+item_seq = defaultdict(set)
+aver_seq_num = 0
+for data_i in data:
+    u, i = data_i.strip('\n').split()
+    user_seq[u].append(i)
+    item_seq[i].add(u)
+json.dump(user_seq, open('./kuairand/data.json', 'w'))   
 
-# for user_i in user_seq:
-#     aver_seq_num+=len(user_seq[user_i])
-# print(aver_seq_num/len(user_seq))
+for user_i in user_seq:
+    aver_seq_num+=len(user_seq[user_i])
+print(aver_seq_num/len(user_seq))
     
-# rnd_user = list(user_seq.keys())
-# random.shuffle(rnd_user)
-# usernum = len(rnd_user)
+rnd_user = list(user_seq.keys())
+random.shuffle(rnd_user)
+usernum = len(rnd_user)
 
-# test_idx = rnd_user[:usernum//5]
-# train_idx = rnd_user[usernum//5:]
-# print(len(train_idx))
-# print(len(test_idx))
+test_idx = rnd_user[:usernum//5]
+train_idx = rnd_user[usernum//5:]
+print(len(train_idx))
+print(len(test_idx))
 
-# test_u_seq = {}
-# train_u_seq = {}
-# for u in test_idx:
-#     if len(user_seq[u]) <= 10:
-#         continue
-#     test_u_seq[u] = user_seq[u]
+test_u_seq = {}
+train_u_seq = {}
+for u in test_idx:
+    if len(user_seq[u]) <= 10:
+        continue
+    test_u_seq[u] = user_seq[u]
 
-# for u in train_idx:
-#     if len(user_seq[u]) <= 10:
-#         continue
-#     train_u_seq[u] = user_seq[u]
+for u in train_idx:
+    if len(user_seq[u]) <= 10:
+        continue
+    train_u_seq[u] = user_seq[u]
 
-# print(len(train_u_seq))
-# print(len(test_u_seq))
-# json.dump(train_u_seq, open('./kuairand/train_data.json', 'w'))
-# json.dump(test_u_seq, open('./kuairand/test_data.json', 'w'))
+print(len(train_u_seq))
+print(len(test_u_seq))
+json.dump(train_u_seq, open('./kuairand/train_data.json', 'w'))
+json.dump(test_u_seq, open('./kuairand/test_data.json', 'w'))
 
 train_data = json.load(open('./kuairand/train_data.json'))
 test_data = json.load(open('./kuairand/test_data.json'))
@@ -140,13 +140,11 @@ user_test = {}
 for u in train_data:
     itemnum_train+=train_data[u]
     user_train[int(u)] = [int(i) for i in train_data[u]]
-# print(itemnum_train, np.max(list(user_train.keys())))
 itemnum_train = len(set(itemnum_train))
 
 for u in test_data:
     itemnum_test+=test_data[u]
     user_test[int(u)] = [int(i) for i in test_data[u]]
-# print(itemnum_test, np.max(list(user_train.keys())))
 itemnum_test = len(set(itemnum_test))
 
 
@@ -161,8 +159,6 @@ cate = (item2cate, cate_pool)
 from multiprocessing import Pool
 import os, time, random
 import json
-# /kuairand_train_new
-# os.mkdir('./kuairand-data/')
 def run(part_id, total_part_num):
     print("Starting part " + str(part_id), len(user_train))
     num_items = len(item2cate)
@@ -235,28 +231,10 @@ def run(part_id, total_part_num):
 
         print("Part " + str(part_id) + " finished!")
 
-    # with open('./kuairand-train-merge.txt', 'w+') as fout:
-    #     for i in tqdm(range(100), total=100):
-    #         with open('./kuairand_train/kuairand-train_%d.txt' % i) as f:
-    #             lines = f.readlines()
-    #         np.random.shuffle(lines)
-    #         for line in lines:
-    #             fout.write(line)
-    #     fout.close()
-    
-    # with open('./kuairand-test-merge.txt', 'w+') as fout:
-    #     for i in tqdm(range(100), total=100):
-    #         with open('./kuairand_test/kuairand-test_%d.txt' % i) as f:
-    #             lines = f.readlines()
-    #         np.random.shuffle(lines)
-    #         for line in lines:
-    #             fout.write(line)
-    #     fout.close()
-
 if __name__=='__main__':
     print('Parent process %s.' % os.getpid())
     p = Pool(1)
-    for i in range(1):   #100为所需要的txt数量。   
+    for i in range(1):  
         p.apply_async(run, args=(i,1))
     print('Waiting for all subprocesses done...')
     p.close()
