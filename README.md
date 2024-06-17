@@ -2,7 +2,7 @@
 ---
 ## Paper code and data
 https://github.com/goodstudy255/STAND-code/blob/main/README.md
-This is the code for the Recsys 2024 underreview paper: [Short-Term Interests And Next Behavior Reconstruction with Diffusion Model Retrieval](Paper 87). We have implemented our methods in **Tensorflow**.
+This is the code for the Recsys 2024 underreview paper: [Unleashing the Potential of Two-Twoer Models: Diffusion-Based Cross-Interaction for Large-Scale Matching](Paper 161). We have implemented our methods in **Tensorflow**.
 
 These are two datasets we used in our paper， Kuairand and ml-1m respectively. After download them, you can correct the path into your own in `dataset_proess.py` and `ml_1m_process.py` respectively.
 
