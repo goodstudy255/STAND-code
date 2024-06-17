@@ -214,7 +214,7 @@ def main(options, modelconf="config/model.conf"):
                     print ("max_recall@{}: ".format(str(cut_off[i])) + str(max_recall[i])+" max_mrr@{}: ".format(str(cut_off[i]))+str(max_mrr[i]))
                 if increase_num==0:
                     epoch_num += 1
-                if epoch_num==3:
+                if epoch_num==5:
                     print("Early stop")
                     sys.exit(0)    
                 test_data.flush()
@@ -230,25 +230,6 @@ def main(options, modelconf="config/model.conf"):
             test_model.build_test_model()
         with tf.Session(graph =train_graph) as train_sess:
             train_sess.run(tf.global_variables_initializer())
-
-            Total_params = 0 
-            Trainable_params = 0
-            NonTrainable_params = 0
-
-            for var in tf.global_variables():
-                shape = var.shape 
-                array = np.asarray([dim.value for dim in shape]) 
-                mulValue = np.prod(array) 
-
-                Total_params += mulValue 
-                if var.trainable:
-                    Trainable_params += mulValue 
-                else:
-                    NonTrainable_params += mulValue
-
-            print(f'Total params: {Total_params}')
-            print(f'Trainable params: {Trainable_params}')
-            print(f'Non-trainable params: {NonTrainable_params}')
 
             merged = tf.summary.merge_all() 
             log_path = "loss_log/"+str(datetime.datetime.now())
