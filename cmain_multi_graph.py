@@ -1,9 +1,7 @@
 # coding=utf-8
 from optparse import OptionParser
 import tensorflow as tf
-import pandas as pd
 import numpy as np
-from data_prepare.entity.samplepack import Samplepack
 from data_prepare.load_dict import load_random,load_random_k
 from data_prepare.kuairand_read_txt import load_data_k
 from data_prepare.ml_1m_read_text import load_data_m
@@ -18,7 +16,7 @@ kuairand_train = 'kuairand/kuairand-train_0.txt'
 kuairand_test = 'kuairand/kuairand-test_0.txt'
 
 ml_1m_train = 'ml-1m/ml-1m-train_0.txt'
-ml_1m_test = 'ml-1m-test_0.txt'
+ml_1m_test = 'ml-1m/ml-1m-test_0.txt'
 
 def load_tt_datas(config={}, reload=True):
     if reload:
@@ -53,11 +51,6 @@ def load_tt_datas(config={}, reload=True):
             config['pre_embedding_tag'] = emb_dict_tag
             config['item2tag'] = item2tag
             config['item2idx'] = item2idx
-
-            path = 'datas/mid_data'
-
-
-
     else:
         print ("not reload the datasets.")
         print(config['dataset'])
@@ -90,18 +83,12 @@ def load_tt_datas(config={}, reload=True):
             config['pre_embedding_tag'] = emb_dict_tag
             config['item2tag'] = item2tag
             config['item2idx'] = item2idx
-
-            path = 'datas/mid_data'
             print("-----")
 
     return train_data, test_data
 
 
 def load_conf(model, modelconf):
-    '''
-    model: 需要加载的模型
-    modelconf: model config文件所在的路径
-    '''
     # load model config
     model_conf = read_conf(model, modelconf)
     if model_conf is None:
@@ -179,6 +166,7 @@ def main(options, modelconf="config/model.conf"):
     reload = options.reload
     is_train = not options.not_train
     model_path = options.model_path
+    print(model_path)
 
     module, obj, config = load_conf(model, modelconf)
     config['model'] = model
@@ -197,8 +185,6 @@ def main(options, modelconf="config/model.conf"):
     if not is_train and test_data!=None:
         max_recall = []
         max_mrr = []
-        cut_off = [1,2,5,20,50]
-        # cut_off = [5,10,50,100,200]
         epoch_num = 0
         for i in range(len(cut_off)):
             max_recall.append(0.0)
@@ -230,7 +216,7 @@ def main(options, modelconf="config/model.conf"):
                 if increase_num==0:
                     epoch_num += 1
                 if epoch_num==3:
-                    print("长时间指标未增长，训练结束")
+                    print("Early stop")
                     sys.exit(0)    
                 test_data.flush()
     else:
@@ -283,7 +269,7 @@ def main(options, modelconf="config/model.conf"):
                         train_model.train(train_sess,e, train_data, merged, writer)
                     else:
                         train_model.train(train_sess, train_data, test_data)
-                    print('训练时间',time.time()-start)
+                    print('Train time cost',time.time()-start)
                     train_saver = tf.train.Saver()  
                     train_saver.save(train_sess, train_model_save_path)
                 if test_data != None:
@@ -294,7 +280,7 @@ def main(options, modelconf="config/model.conf"):
                         sent_data = test_data
                         start = time.time()
                         recall, mrr = test_model.test(test_sess, sent_data)
-                        print('测试时间',time.time()-start)
+                        print('Test time cost',time.time()-start)
                         print(recall, mrr)
                         increase_num = 0
                         for i in range(len(max_recall)):
