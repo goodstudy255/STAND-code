@@ -199,11 +199,6 @@ class T2diff(NN):
             k = tf.concat(tf.split(k, head_num, axis=2), axis=0) #(head_num*batch_size, max_action_length, atten_unit)
             v = tf.concat(tf.split(v, head_num, axis=2), axis=0) #(head_num*batch_size, max_action_length, atten_unit)
             inner_product = tf.matmul(q, k, transpose_b=True) / np.sqrt(atten_unit) #(head_num*batch_size, max_action_length, max_action_length)
-            # mask = tf.tile(mask, [head_num, 1]) #(head_num * batch_size, max_action_length)
-            # mask = tf.tile(tf.expand_dims(mask, 1), [1, max_action_len, 1]) #(head_num * batch_size, max_action_length, max_action_length)
-            # padding = tf.ones_like(inner_product) * (-2 ** 32 + 1)
-            # inner_product = tf.matrix_set_diag(inner_product, tf.ones_like(inner_product)[:,:,0] * (-2 ** 32 + 1))
-            # inner_product = tf.where(tf.equal(mask, 1), inner_product, padding)
             inner_product = tf.nn.softmax(inner_product) #(head_num * batch_size, max_action_length, max_action_length)
             outputs = tf.matmul(inner_product, v) #(head_num*batch_size, max_action_length, atten_unit)
             outputs = tf.concat(tf.split(outputs, head_num, axis=0), axis=2) #(batch_size, max_action_length, atten_unit * head_num)
@@ -240,8 +235,7 @@ class T2diff(NN):
                 alpha_hats = tf.gather(alpha_hats, t, axis=0)
                 alpha_hats = tf.expand_dims(tf.expand_dims(alpha_hats, axis=1), axis=2)
                 alpha_hats = tf.tile(alpha_hats, [1, action_lens, hidden_dim])
-                noised_t_input = tf.sqrt(alpha_hats)*diff + tf.sqrt(1-alpha_hats)*gaussian_noise # 加入t步高斯噪声
-                # noised_t_input = tf.sqrt(alpha_hats[t])*diff + tf.sqrt(1-alpha_hats[t])*gaussian_noise # 加入t步高斯噪声
+                noised_t_input = tf.sqrt(alpha_hats)*diff + tf.sqrt(1-alpha_hats)*gaussian_noise 
                 noised_t_input = tf.concat((noised_t_input, inputs),axis=-1)
 
                 # step_emb = tf.convert_to_tensor(step_embs[t], dtype=tf.float32)
@@ -249,31 +243,21 @@ class T2diff(NN):
                 step_emb = tf.gather(step_emb, t, axis=0)
                 step_emb = tf.expand_dims(step_emb, axis=1)
                 step_emb = tf.tile(step_emb, [1, action_lens, 1])
-                reconstructed_t = self.unet(noised_t_input + step_weight*step_emb, num_layers=4, out_dims=hidden_dim) # 重建为x0 x-prediction
+                reconstructed_t = self.unet(noised_t_input + step_weight*step_emb, num_layers=4, out_dims=hidden_dim) 
+                KL_loss = tf.math.reduce_mean(tf.sqrt(tf.math.reduce_sum(tf.square(diff-reconstructed_t), axis=-1))) 
 
-                # origin_diff_norm = tf.sqrt(tf.reduce_sum(tf.square(diff), 1, True))
-                # new_diff_norm = tf.sqrt(tf.reduce_sum(tf.square(reconstructed_t), 1, True))
-                # diff_prod = tf.reduce_sum(tf.multiply(diff, reconstructed_t), 1, True)
-                # diff_norm_prod = tf.multiply(origin_diff_norm, new_diff_norm)
-                # cos_sim_diff = tf.truediv(diff_prod, diff_norm_prod+1e-5)
-                # KL_loss = tf.math.reduce_mean(1-cos_sim_diff)
-                KL_loss = tf.math.reduce_mean(tf.sqrt(tf.math.reduce_sum(tf.square(diff-reconstructed_t), axis=-1))) # 实际简化为mse_loss
-
-                predicted_next = (inputs + reconstructed_t)[:, -1:, :] # [B, h]
-                # predicted_next = tf.stop_gradient(predicted_next)
+                predicted_next = (inputs + reconstructed_t)[:, -1:, :] 
             else:
                 # test graph
                 KL_loss = None
                 infer_steps = total_steps
                 gaussian_noise_diffu = tf.random.normal(shape=tf.shape(inputs), mean=0, stddev=1)
-                # diff = input_with_target - inputs
-                # noised_t = tf.concat([diff[:, 1:, :], gaussian_noise_diffu[:, -1:, :]], axis=1)
                 noised_t = gaussian_noise_diffu
                 for t in range(infer_steps-1, -1, -1): 
                     noised_t_input = tf.concat((noised_t,inputs),axis = -1)                
                     
                     step_emb = tf.convert_to_tensor(step_embs[t], dtype=tf.float32)
-                    reconstructed_t = self.unet(noised_t_input + step_weight*step_emb, num_layers=4, out_dims=hidden_dim) # 重建为x0 x-prediction
+                    reconstructed_t = self.unet(noised_t_input + step_weight*step_emb, num_layers=4, out_dims=hidden_dim)
                     if t == 0:
                         noised_t = reconstructed_t
                     else:
@@ -329,8 +313,6 @@ class T2diff(NN):
             name="lab_input_tag"
         )
 
-        # self.lab_input = tf.concat((self.lab_input,self.lab_input_tag),axis=0)
-
         # the lookup dict.
         with tf.variable_scope('model'):
             self.embe_dict = tf.Variable(
@@ -370,7 +352,6 @@ class T2diff(NN):
         lab_input_emb = tf.expand_dims(self.lab_input_emb,1)
 
         extended_input = tf.concat([inputs, lab_input_emb], axis=1)
-        # extended_input = self.simple_dnn(extended_input, sub_name="mlp", hidden_units=[4]) 
         KL_loss, predicted_next = self.diffusion(extended_input[:, : -1, :], extended_input[:, 1: , :], 1)
         predicted_next = tf.squeeze(predicted_next,1)
 
@@ -383,27 +364,11 @@ class T2diff(NN):
         len_res = tf.norm(lab_input_emb,ord = 2)* tf.norm(predicted_next,ord = 2)
         similarity = tf.reduce_mean(dot_res/len_res)
 
-        
-
-        # session_inputs = tf.concat([extended_input[:, :-1, :], predicted_next], axis=1)
         session_inputs = extended_input[:, : -1, :]
         history_play_actual_lens = tf.cast(tf.reduce_sum(tf.sign(tf.reduce_max(tf.abs(session_inputs), axis=2, keepdims=True)), axis=1, keepdims=True), tf.float32)
         session_inputs = self.self_attention(session_inputs, history_play_actual_lens, atten_unit=2, head_num=2)
         # session_inputs = tf.math.reduce_mean(session_inputs, 1, False)
         din_out = session_inputs[:, -1, :]
-
-        # din_out  = self.target_attention(session_inputs, extended_input[:, :-11, ])
-        
-        # session_inputs = tf.squeeze(session_inputs,axis=1)
-
-        # din_out = tf.concat((din_out,session_inputs),axis = -1)
-
-        # self.w1 = tf.Variable(
-        #     tf.random_normal([self.edim, self.edim], stddev=self.stddev),
-        #     trainable=True
-        # )
-        
-        # din_out = tf.tanh(tf.matmul(session_inputs,self.w1))
 
         self.pre_tag = tf.cast(self.pre_tag,tf.float32)
         embe_dict_all_tag = tf.matmul(self.pre_tag[1:],self.embe_dict_tag)/tf.reduce_sum(self.pre_tag[1:],axis=-1,keepdims=True)  
@@ -418,7 +383,6 @@ class T2diff(NN):
                 self.loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=sco_mat,labels = self.lab_input)
                 loss = tf.reduce_mean(self.loss)
                 tf.summary.scalar("loss",loss)
-                # tf.summary.scalar("similarity",similarity)
                 
                 self.loss_kl = KL_loss
                 if KL_loss is not None:
@@ -434,8 +398,6 @@ class T2diff(NN):
         '''
         build the MemNN model
         '''
-        # the input.
-        print('测试')
         
         self.inputs = tf.placeholder(
             tf.int32,
@@ -524,28 +486,13 @@ class T2diff(NN):
         session_inputs = tf.concat([extended_input[:, : -1, :], lab_input_emb], axis=1)
         history_play_actual_lens = tf.cast(tf.reduce_sum(tf.sign(tf.reduce_max(tf.abs(session_inputs), axis=2, keepdims=True)), axis=1, keepdims=True), tf.float32)
         session_inputs = self.self_attention(session_inputs, history_play_actual_lens, atten_unit=2, head_num=2)
-        # session_inputs = tf.math.reduce_mean(session_inputs, 1, False)
+
         din_out = session_inputs[:, -1, :]
-
-        # din_out  = self.target_attention(session_inputs, extended_input[:, :-11, ])
-        
-        # session_inputs = tf.squeeze(session_inputs,axis=1)
-
-        # din_out = tf.concat((din_out,session_inputs),axis = -1)
-
-        # self.w1 = tf.Variable(
-        #     tf.random_normal([self.edim, self.edim], stddev=self.stddev),
-        #     trainable=True
-        # )
-        
-        # din_out = tf.tanh(tf.matmul(session_inputs,self.w1))
 
         self.pre_tag = tf.cast(self.pre_tag,tf.float32)
         embe_dict_all_tag = tf.matmul(self.pre_tag[1:],self.embe_dict_tag)/tf.reduce_sum(self.pre_tag[1:],axis=-1,keepdims=True)  
         self.embe_new_dict= tf.concat((self.embe_dict[2:],embe_dict_all_tag),axis=-1)
-        # self.embe_new_dict = self.simple_dnn(self.embe_new_dict, sub_name="mlp", hidden_units=[4]) 
-        # predicted_next = tf.squeeze(predicted_next, axis=1)
-        # sco_mat = tf.matmul(predicted_next,self.embe_new_dict,transpose_b= True)
+
         sco_mat = tf.matmul(din_out,self.embe_new_dict,transpose_b= True)
 
         with tf.name_scope('test_loss'):
@@ -567,8 +514,6 @@ class T2diff(NN):
         while bt.has_next():    # batch round.
             # get this batch data
             batch_data = bt.next_batch()
-            # build the feed_dict
-            # for x,y in zip(batch_data['in_idxes'],batch_data['out_idxes']):
             batch_lenth = len(batch_data['in_idxes'])
             event = len(batch_data['in_idxes'][0])
 
@@ -589,7 +534,6 @@ class T2diff(NN):
                     batch_seq_l = []
                     for tmp_in, tmp_out in zip(tmp_in_data, tmp_out_data):
                         _in = tmp_in[-1]
-                        # _out = int(np.mean(tmp_out))
                         _out = tmp_out[0]
                         batch_last.append(_in)
                         batch_in.append(tmp_in)
@@ -601,7 +545,6 @@ class T2diff(NN):
                     batch_last_tags = []
                     for tmp_in, tmp_out in zip(tmp_in_tags, tmp_out_tags):
                         _in = tmp_in[-1]
-                        # _out = int(np.mean(tmp_out))
                         _out = tmp_out[0]
                         batch_last_tags.append(_in)
                         batch_in_tags.append(tmp_in)
@@ -633,14 +576,12 @@ class T2diff(NN):
                     tmp_out_data = batch_data['out_idxes'][i:]
                     tmp_in_tags = batch_data['in_tags'][i:]
                     tmp_out_tags = batch_data['out_tags'][i:]
-                    # for s in range(len(tmp_in_data[0])):
                     batch_in = []
                     batch_out = []
                     batch_last = []
                     batch_seq_l = []
                     for tmp_in, tmp_out in zip(tmp_in_data, tmp_out_data):
                         _in = tmp_in[-1]
-                        # _out = int(np.mean(tmp_out))
                         _out = tmp_out[0]
                         batch_last.append(_in)
                         batch_in.append(tmp_in)
@@ -651,7 +592,6 @@ class T2diff(NN):
                     batch_last_tags = []
                     for tmp_in, tmp_out in zip(tmp_in_tags, tmp_out_tags):
                         _in = tmp_in[-1]
-                        # _out = int(np.mean(tmp_out))
                         _out = tmp_out[0]
                         batch_last_tags.append(_in)
                         batch_in_tags.append(tmp_in)
@@ -673,11 +613,8 @@ class T2diff(NN):
                         feed_dict=feed_dict
                     )
                     graph = sess.run(merged,feed_dict=feed_dict)
-                    # tf.summary.scalar("train_loss",crt_loss)
                     writer.add_summary(graph,batch+max_length*epoch)
-                    # cost = np.mean(crt_loss)
                     c += list(crt_loss)
-                    # print("Batch:" + str(batch) + ",cost:" + str(cost))
                     batch += 1
             else:
                 max_length = 1
@@ -685,14 +622,12 @@ class T2diff(NN):
                 tmp_out_data = batch_data['out_idxes']
                 tmp_in_tags = batch_data['in_tags'] #[i:i+self.batch_size]
                 tmp_out_tags = batch_data['out_tags']  #[i:i+self.batch_size]
-                # for s in range(len(tmp_in_data[0])):
                 batch_in = []
                 batch_out = []
                 batch_last = []
                 batch_seq_l = []
                 for tmp_in, tmp_out in zip(tmp_in_data, tmp_out_data):
                     _in = tmp_in[-1]
-                    # _out = int(np.mean(tmp_out))
                     _out = tmp_out[0]
                     batch_last.append(_in)
                     batch_in.append(tmp_in)
@@ -703,7 +638,6 @@ class T2diff(NN):
                 batch_last_tags = []
                 for tmp_in, tmp_out in zip(tmp_in_tags, tmp_out_tags):
                     _in = tmp_in[-1]
-                    # _out = int(np.mean(tmp_out))
                     _out = tmp_out[0]
                     batch_last_tags.append(_in)
                     batch_in_tags.append(tmp_in)
@@ -724,14 +658,9 @@ class T2diff(NN):
                     feed_dict=feed_dict
                 )
                 graph = sess.run(merged,feed_dict=feed_dict)
-                # tf.summary.scalar("train_loss",crt_loss)
                 writer.add_summary(graph,batch+max_length*epoch)
-
-                # cost = np.mean(crt_loss)
                 c += list(crt_loss)
-                # print("Batch:" + str(batch) + ",cost:" + str(cost))
                 batch += 1
-        # train_acc = self.test(sess,train_data)
         avgc = np.mean(c)
         if np.isnan(avgc):
             print('Epoch {}: NaN error!'.format(str(epoch)))
@@ -741,8 +670,6 @@ class T2diff(NN):
             
 
     def test(self,sess,test_data):
-        # calculate the acc
-        # print('Measuring Recall@{} and MRR@{}'.format(self.cut_off, self.cut_off))
         self.train_flag = False
         mrr, recall = [], []
         for i in range(len(self.cut_off)):
@@ -756,14 +683,9 @@ class T2diff(NN):
             class_num = self.n_items,
             random = False
         )
-        # merged = tf.summary.merge_all()
-        # writer = tf.summary.FileWriter("loss_log/", sess.graph)
-        # summary_merge = tf.summary.merge_all() 
         while bt.has_next():    # batch round.
             # get this batch data
             batch_data = bt.next_batch()
-            # build the feed_dict
-            # for x,y in zip(batch_data['in_idxes'],batch_data['out_idxes']):
             batch_lenth = len(batch_data['in_idxes'])
             event = len(batch_data['in_idxes'][0])
             if batch_lenth > self.batch_size:
@@ -778,17 +700,12 @@ class T2diff(NN):
                     tmp_in_tags = batch_data['in_tags'][i:i+self.batch_size]
                     tmp_out_tags = batch_data['out_tags'][i:i+self.batch_size]
 
-                    
-                    # for s in range(len(tmp_in_data[0])):
                     batch_in = []
                     batch_out = []
                     batch_last = []
                     batch_seq_l = []
                     for tmp_in, tmp_out in zip(tmp_in_data, tmp_out_data):
-                        # tmp_in = [i-1 for i in tmp_in]
-                        # tmp_out = [i-1 for i in tmp_out]
                         _in = tmp_in[-1]
-                        # _out = int(np.mean(tmp_out))
                         _out = tmp_out[0]
                         batch_last.append(_in)
                         batch_in.append(tmp_in)
@@ -799,10 +716,7 @@ class T2diff(NN):
                     batch_out_tags = []
                     batch_last_tags = []
                     for tmp_in, tmp_out in zip(tmp_in_tags, tmp_out_tags):
-                        # tmp_in = [i-1 for i in tmp_in]
-                        # tmp_out = [i-1 for i in tmp_out]
                         _in = tmp_in[-1]
-                        # _out = int(np.mean(tmp_out))
                         _out = tmp_out[0]
                         batch_last_tags.append(_in)
                         batch_in_tags.append(tmp_in)
@@ -824,13 +738,8 @@ class T2diff(NN):
                         [self.softmax_input, self.loss],
                         feed_dict=feed_dict
                     )
-                    # graph = sess.run(merged,feed_dict=feed_dict)
-                    # writer.add_summary(graph,batch)
                     t_r, t_m, ranks = cau_recall_mrr_org_list(preds, batch_out, cutoff=self.cut_off)
-                    # test_data.pack_ext_matrix('alpha', alpha, tmp_batch_ids)
                     test_data.pack_preds(ranks, tmp_batch_ids)
-                    # tf.summary.scalar("test_loss",loss)
-                    # writer.add_summary(graph,batch)
                     c_loss += list(loss)
                     for k in range(len(self.cut_off)):
                         recall[k] += t_r[k]
@@ -845,16 +754,12 @@ class T2diff(NN):
 
                     tmp_in_tags = batch_data['in_tags'][i:]
                     tmp_out_tags = batch_data['out_tags'][i:]
-                    # for s in range(len(tmp_in_data[0])):
                     batch_in = []
                     batch_out = []
                     batch_last = []
                     batch_seq_l = []
                     for tmp_in, tmp_out in zip(tmp_in_data, tmp_out_data):
-                        # tmp_in = [i-1 for i in tmp_in]
-                        # tmp_out = [i-1 for i in tmp_out]
                         _in = tmp_in[-1]
-                        # _out = int(np.mean(tmp_out))
                         _out = tmp_out[0]
                         batch_last.append(_in)
                         batch_in.append(tmp_in)
@@ -864,10 +769,7 @@ class T2diff(NN):
                     batch_out_tags = []
                     batch_last_tags = []
                     for tmp_in, tmp_out in zip(tmp_in_tags, tmp_out_tags):
-                        # tmp_in = [i-1 for i in tmp_in]
-                        # tmp_out = [i-1 for i in tmp_out]
                         _in = tmp_in[-1]
-                        # _out = int(np.mean(tmp_out))
                         _out = tmp_out[0]
                         batch_last_tags.append(_in)
                         batch_in_tags.append(tmp_in)
@@ -887,19 +789,12 @@ class T2diff(NN):
                         [self.softmax_input, self.loss],
                         feed_dict=feed_dict
                     )
-                    # graph = sess.run(merged,feed_dict=feed_dict)
-                    # writer.add_summary(graph,batch)
                     t_r, t_m, ranks = cau_recall_mrr_org_list(preds, batch_out, cutoff=self.cut_off)
-                    # test_data.pack_ext_matrix('alpha', alpha, tmp_batch_ids)
                     test_data.pack_preds(ranks, tmp_batch_ids)
-                    # tf.summary.scalar("test_loss",loss)
-                    # writer.add_summary(graph,batch)
                     c_loss += list(loss)
                     for k in range(len(self.cut_off)):
                         recall[k] += t_r[k]
                         mrr[k] += t_m[k]
-                    # recall += t_r
-                    # mrr += t_m
                     batch += 1
             else:
                 tmp_in_data = batch_data['in_idxes']
@@ -907,16 +802,12 @@ class T2diff(NN):
                 tmp_batch_ids = batch_data['batch_ids']
                 tmp_in_tags = batch_data['in_tags'] #[i:i+self.batch_size]
                 tmp_out_tags = batch_data['out_tags'] #[i:i+self.batch_size]
-                # for s in range(len(tmp_in_data[0])):
                 batch_in = []
                 batch_out = []
                 batch_last = []
                 batch_seq_l = []
                 for tmp_in, tmp_out in zip(tmp_in_data, tmp_out_data):
-                    # tmp_in = [i-1 for i in tmp_in]
-                    # tmp_out = [i-1 for i in tmp_out]
                     _in = tmp_in[-1]
-                    # _out = int(np.mean(tmp_out))
                     _out = tmp_out[0]
                     batch_last.append(_in)
                     batch_in.append(tmp_in)
@@ -926,10 +817,7 @@ class T2diff(NN):
                 batch_out_tags = []
                 batch_last_tags = []
                 for tmp_in, tmp_out in zip(tmp_in_tags, tmp_out_tags):
-                    # tmp_in = [i-1 for i in tmp_in]
-                    # tmp_out = [i-1 for i in tmp_out]
                     _in = tmp_in[-1]
-                    # _out = int(np.mean(tmp_out))
                     _out = tmp_out[0]
                     batch_last_tags.append(_in)
                     batch_in_tags.append(tmp_in)
@@ -949,19 +837,11 @@ class T2diff(NN):
                     [self.softmax_input, self.loss],
                     feed_dict=feed_dict
                 )
-                # graph = sess.run(merged,feed_dict=feed_dict)
-                # writer.add_summary(graph,batch)
                 t_r, t_m, ranks = cau_recall_mrr_org_list(preds, batch_out, cutoff=self.cut_off)
-                # test_data.pack_ext_matrix('alpha', alpha, tmp_batch_ids)
                 test_data.pack_preds(ranks, tmp_batch_ids)
-                # tf.summary.scalar("test_loss",loss)
-                # writer.add_summary(graph,batch)
                 c_loss += list(loss)
-                # recall += t_r
-                # mrr += t_m
                 for k in range(len(self.cut_off)):
                     recall[k] += t_r[k]
                     mrr[k] += t_m[k]
                 batch += 1
-        # print (np.mean(c_loss))
         return  np.mean(recall,axis=1), np.mean(mrr,axis=1)
