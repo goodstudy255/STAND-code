@@ -38,7 +38,6 @@ for item_id, cate in enumerate(video_feature['tag']):
         
 print('itemnum:', len(item2cate))
 
-# items_set = set([i for i in cnter if cnter[i] >= 70])
 items_set = set([i for i in cnter])
 print(len(items_set))
 
