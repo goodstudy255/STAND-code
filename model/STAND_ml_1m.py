@@ -15,12 +15,12 @@ import math
 
 # 相较于v5，提升了噪声的影响力，修复训练选取t步时不随机的问题
 
-class Seq2SeqAttNN(NN):
+class T2diff(NN):
     """
     The memory network with context attention.
     """
     def __init__(self, config):
-        super(Seq2SeqAttNN, self).__init__(config)
+        super(T2diff, self).__init__(config)
         self.config = None
         if config != None:
             self.config = config
@@ -442,7 +442,7 @@ class Seq2SeqAttNN(NN):
             self.softmax_input = sco_mat
             # the optimize.
             self.params = tf.trainable_variables()
-            self.optimize = super(Seq2SeqAttNN, self).optimize_normal(
+            self.optimize = super(T2diff, self).optimize_normal(
                 self.loss, self.params)
     
     def build_test_model(self):

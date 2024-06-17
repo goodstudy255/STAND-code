@@ -13,12 +13,12 @@ from util.FileDumpLoad import dump_file
 import sys
 import math
 
-class Seq2SeqAttNN(NN):
+class T2diff(NN):
     """
     The memory network with context attention.
     """
     def __init__(self, config):
-        super(Seq2SeqAttNN, self).__init__(config)
+        super(T2diff, self).__init__(config)
         self.config = None
         if config != None:
             self.config = config
@@ -83,33 +83,6 @@ class Seq2SeqAttNN(NN):
         # the params need to be trained.
         self.params = None
         self.train_flag = True
-
-    def optimize_normal(self, loss, params):
-        '''
-        optimize
-        loss: the loss.
-        params: the params need to be optimized.
-        '''
-        # the optimize.
-        self.global_step = tf.Variable(0, name='global_step')
-        if self.is_update_lr:
-            self.lr = self.update_lr()
-        else:
-            self.lr = tf.Variable(self.init_lr, trainable=False)
-        self.optimizer = tf.train.AdagradOptimizer(self.lr)
-        grads_and_vars = self.optimizer.compute_gradients(loss, params)
-        if self.max_grad_norm != None:
-            clipped_grads_and_vars = [
-                (tf.clip_by_norm(gv[0], self.max_grad_norm), gv[1]) for gv in grads_and_vars
-            ]
-        else:
-            clipped_grads_and_vars = grads_and_vars
-        inc = self.global_step.assign_add(1)
-        optimize = None
-        with tf.control_dependencies([inc]):
-            optimize = self.optimizer.apply_gradients(
-                clipped_grads_and_vars)
-        return optimize
         
     def ln(self,inputs, epsilon = 1e-8, scope="ln"):
         with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
@@ -133,7 +106,7 @@ class Seq2SeqAttNN(NN):
                 x = tf.layers.dense(x, 1, activation=None, name='linear', use_bias=False, kernel_initializer=tf.glorot_normal_initializer(), reuse=tf.AUTO_REUSE)
         return x 
     
-    def target_attention(self,recent_play, play_history,sub_name="target_attention", debug_name=""):
+    def target_attention(self,recent_play, play_history,sub_name="target_attention"):
         with tf.variable_scope("%s" % sub_name, reuse=tf.AUTO_REUSE):
             recent_play = tf.tile(recent_play, [1, 40, 1])
             din_input = tf.concat([recent_play, play_history, recent_play-play_history, recent_play*play_history], axis=-1)
@@ -186,7 +159,7 @@ class Seq2SeqAttNN(NN):
 
             return outputs
     
-    def self_attention(self,inputs, inputs_action_len, atten_unit=16, head_num=4, scope_name="self_attention", debug_name=""):
+    def transformer(self,inputs, inputs_action_len, atten_unit=16, head_num=4, scope_name="transformer", debug_name=""):
         """
         inputs: user action list, (batch_size x max_action_length x action_dim)
         return concat(inputs, context_info)
@@ -216,28 +189,6 @@ class Seq2SeqAttNN(NN):
             outputs = self.ln(outputs, scope="ln_2")
             return outputs
     
-    def multi_head_attention(self, inputs, query, inputs_action_len, atten_unit=16, head_num=4, scope_name="multi_head_attention"):
-        action_dim = 50
-        max_action_len = inputs.get_shape().as_list()[1]
-        with tf.variable_scope(scope_name):
-            mask = tf.cast(tf.sequence_mask(tf.reshape(inputs_action_len, [-1]), max_action_len), tf.float32)
-            Q = self.get_norm_variable("Q_mat", action_dim, atten_unit * head_num) 
-            K = self.get_norm_variable("K_mat", action_dim, atten_unit * head_num) 
-            V = self.get_norm_variable("V_mat", action_dim, atten_unit * head_num) 
-            q = tf.tensordot(query, Q, axes=(-1,0)) 
-            k = tf.tensordot(inputs, K, axes=(-1,0)) 
-            v = tf.tensordot(inputs, V, axes=(-1,0))
-            q = tf.concat(tf.split(q, head_num, axis=2), axis=0) 
-            k = tf.concat(tf.split(k, head_num, axis=2), axis=0) 
-            v = tf.concat(tf.split(v, head_num, axis=2), axis=0)
-            inner_product = tf.matmul(q, k, transpose_b=True) / np.sqrt(atten_unit) 
-            inner_product = tf.nn.softmax(inner_product) 
-            outputs = tf.matmul(inner_product, v) 
-            outputs = tf.concat(tf.split(outputs, head_num, axis=0), axis=2) 
-            outputs = tf.layers.dense(outputs, action_dim, name='linear', use_bias=False, kernel_initializer=tf.glorot_normal_initializer(), reuse=tf.AUTO_REUSE) # linear
-            outputs = self.ln(outputs, scope="attention_ln") 
-            return outputs
-    
     def diffusion(self, inputs, input_with_target, is_train, sub_name="diffusion", total_steps=5):
         with tf.variable_scope("%s" % sub_name):
             action_lens = 50
@@ -247,7 +198,7 @@ class Seq2SeqAttNN(NN):
             a, b = 1e-2, 4.5
             alphas, betas, alpha_hats, beta_hats = [], [], [], [] 
             for s in range(1, total_steps+1):
-                beta = a*math.exp(b*s/total_steps)
+                beta = a*math.exp(b*s/total_steps) # exponential schedule
                 betas.append(beta)
                 alphas.append(1-beta)
                 alpha_hats.append(1-beta) if s == 1 else alpha_hats.append((1-beta)*alpha_hats[-1])
@@ -256,7 +207,7 @@ class Seq2SeqAttNN(NN):
             step_weight = 1e-2
             step_embs = [[math.sin(t/2**f) for f in range(hidden_dim*2)] for t in range(1, total_steps+1)] 
             
-            if is_train==1:
+            if is_train==1: # training process
                 t = tf.random.uniform(shape=[tf.shape(inputs)[0]], minval=0, maxval=total_steps, dtype=tf.int32)
                 diff = input_with_target - inputs
 
@@ -277,7 +228,7 @@ class Seq2SeqAttNN(NN):
                 KL_loss = tf.math.reduce_mean(tf.sqrt(tf.math.reduce_sum(tf.square(diff-reconstructed_t), axis=-1))) 
 
                 predicted_next = (inputs + reconstructed_t)[:, -1:, :] 
-            else:
+            else: # inference process
                 KL_loss = None
                 infer_steps = total_steps
                 gaussian_noise_diffu = tf.random.normal(shape=tf.shape(inputs), mean=0, stddev=1)
@@ -297,11 +248,6 @@ class Seq2SeqAttNN(NN):
         return KL_loss, predicted_next
 
     def build_train_model(self):
-        '''
-        build the MemNN model
-        '''       
-        print('训练')
-        
         self.inputs = tf.placeholder(
             tf.int32,
             [None,None],
@@ -369,51 +315,43 @@ class Seq2SeqAttNN(NN):
         print_ops = []
         
         inputs_id = tf.nn.embedding_lookup(self.embe_dict, self.inputs,max_norm=1.5)
-        lastinputs_id= tf.nn.embedding_lookup(self.embe_dict, self.last_inputs,max_norm=1.5)
         lab_input_emb = tf.nn.embedding_lookup(self.embe_dict,self.lab_input,max_norm=1.5)
 
         inputs_tag = tf.nn.embedding_lookup(self.embe_dict_tag,self.inputs_tags,max_norm=1.5)
-        lastinputs_tag= tf.nn.embedding_lookup(self.embe_dict_tag, self.last_inputs_tags,max_norm=1.5)
         lab_input_tag_emb = tf.nn.embedding_lookup(self.embe_dict_tag,self.lab_input_tag,max_norm=1.5)
 
         embe_dict_all_tag = tf.nn.embedding_lookup(self.embe_dict_tag,self.pre_tag,max_norm = 1.5)
 
         inputs = tf.concat((inputs_id,inputs_tag),axis=-1)
-        lastinputs = tf.concat((lastinputs_id,lastinputs_tag),axis=-1)
         lab_input_emb = tf.concat((lab_input_emb,lab_input_tag_emb),axis=-1)
         lab_input_emb = tf.expand_dims(lab_input_emb,1)
 
         extended_input = tf.concat([inputs, lab_input_emb], axis=1)
         KL_loss, predicted_next = self.diffusion(extended_input[:, : -1, :], extended_input[:, 1: , :], 1)
         
-        print('predicted_next: ',predicted_next.shape)
         session_inputs = tf.concat([extended_input[:, -11:-1, :], predicted_next], axis=1)
-        history_play_actual_lens = tf.cast(tf.reduce_sum(tf.sign(tf.reduce_max(tf.abs(session_inputs), axis=2, keepdims=True)), axis=1, keepdims=True), tf.float32)
-        session_inputs = self.self_attention(session_inputs, history_play_actual_lens, atten_unit=self.edim//2, head_num=2)
-        session_inputs = tf.math.reduce_mean(session_inputs, 1, True)
-        din_out  = self.target_attention(session_inputs, extended_input[:, :-11, ])
+        history_play_actual_lens = tf.cast(tf.reduce_sum(tf.sign(tf.reduce_max(tf.abs(session_inputs), axis=2, keepdims=True)), axis=1, keepdims=True), tf.float32) # zero-mask
+        session_outputs = self.transformer(session_inputs, history_play_actual_lens, atten_unit=self.edim//2, head_num=2)
+        session_outputs = tf.math.reduce_mean(session_outputs, 1, True)
+        din_out  = self.target_attention(session_outputs, extended_input[:, :-11, ])
         
-        session_inputs = tf.squeeze(session_inputs,axis=1)
-
-        din_out = tf.concat((din_out,session_inputs),axis = -1)
-
+        session_outputs = tf.squeeze(session_outputs,axis=1)
+        user_emb = tf.concat((din_out,session_outputs),axis = -1)
 
         self.embe_new_dict= tf.concat((self.embe_dict[1:],embe_dict_all_tag),axis=-1)
         self.embe_new_dict = self.simple_dnn(self.embe_new_dict, sub_name="mlp", hidden_units=[2*self.edim]) 
-        sco_mat = tf.matmul(din_out,self.embe_new_dict,transpose_b= True)
+        sco_mat = tf.matmul(user_emb,self.embe_new_dict,transpose_b= True)
         
         with tf.control_dependencies(print_ops):   
             with tf.name_scope('train_loss'):
                 self.loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=sco_mat,labels = self.lab_input)
-                ce_loss = tf.reduce_mean(tf.reduce_mean(-tf.log(tf.maximum(predicted_next,1e-9)),axis =-1),axis=-1)
                 loss = tf.reduce_mean(self.loss)
                 tf.summary.scalar("loss",loss)
-                tf.summary.scalar("ce_loss",tf.reduce_mean(ce_loss))
                 
                 self.loss_kl = KL_loss
                 if KL_loss is not None:
                     tf.summary.scalar("KL_loss",KL_loss)
-                    self.loss = self.loss + 10*self.loss_kl+ce_loss
+                    self.loss = self.loss + 10*self.loss_kl
             self.softmax_input = sco_mat
 
             self.params = tf.trainable_variables()
@@ -421,11 +359,6 @@ class Seq2SeqAttNN(NN):
                 self.loss, self.params)
     
     def build_test_model(self):
-        '''
-        build the MemNN model
-        '''
-        print('测试')
-        
         self.inputs = tf.placeholder(
             tf.int32,
             [None,None],
@@ -493,17 +426,14 @@ class Seq2SeqAttNN(NN):
         print_ops = []
         
         inputs_id = tf.nn.embedding_lookup(self.embe_dict, self.inputs,max_norm=1.5)
-        lastinputs_id= tf.nn.embedding_lookup(self.embe_dict, self.last_inputs,max_norm=1.5)
         lab_input_emb = tf.nn.embedding_lookup(self.embe_dict,self.lab_input,max_norm=1.5)
 
         inputs_tag = tf.nn.embedding_lookup(self.embe_dict_tag,self.inputs_tags,max_norm=1.5)
-        lastinputs_tag= tf.nn.embedding_lookup(self.embe_dict_tag, self.last_inputs_tags,max_norm=1.5)
         lab_input_tag_emb = tf.nn.embedding_lookup(self.embe_dict_tag,self.lab_input_tag,max_norm=1.5)
 
         embe_dict_all_tag = tf.nn.embedding_lookup(self.embe_dict_tag,self.pre_tag,max_norm = 1.5)
 
         inputs = tf.concat((inputs_id,inputs_tag),axis=-1)
-        lastinputs = tf.concat((lastinputs_id,lastinputs_tag),axis=-1)
         lab_input_emb = tf.concat((lab_input_emb,lab_input_tag_emb),axis=-1)
         lab_input_emb = tf.expand_dims(lab_input_emb,1)
 
@@ -512,19 +442,19 @@ class Seq2SeqAttNN(NN):
         KL_loss, predicted_next = self.diffusion(extended_input[:, : -1, :], extended_input[:, 1: , :], 0)
         session_inputs = tf.concat([extended_input[:, -11: -1, :], predicted_next], axis=1)
         history_play_actual_lens = tf.cast(tf.reduce_sum(tf.sign(tf.reduce_max(tf.abs(session_inputs), axis=2, keepdims=True)), axis=1, keepdims=True), tf.float32)
-        session_inputs = self.self_attention(session_inputs, history_play_actual_lens, atten_unit=self.edim//2, head_num=2)
-        session_inputs = tf.math.reduce_mean(session_inputs, 1, True)
+        session_outputs = self.transformer(session_inputs, history_play_actual_lens, atten_unit=self.edim//2, head_num=2)
+        session_outputs = tf.math.reduce_mean(session_outputs, 1, True)
 
 
-        din_out  = self.target_attention(session_inputs, extended_input[:, :-11, ])
+        din_out  = self.target_attention(session_outputs, extended_input[:, :-11, ])
         
-        session_inputs = tf.squeeze(session_inputs,axis=1)
+        session_outputs = tf.squeeze(session_outputs,axis=1)
 
-        din_out = tf.concat((din_out,session_inputs),axis = -1)
+        user_emb = tf.concat((din_out,session_outputs),axis = -1)
 
         self.embe_new_dict= tf.concat((self.embe_dict[1:],embe_dict_all_tag),axis=-1)
         self.embe_new_dict = self.simple_dnn(self.embe_new_dict, sub_name="mlp", hidden_units=[2*self.edim]) 
-        sco_mat = tf.matmul(din_out,self.embe_new_dict,transpose_b= True)
+        sco_mat = tf.matmul(user_emb,self.embe_new_dict,transpose_b= True)
 
         with tf.name_scope('test_loss'):
             self.loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=sco_mat,labels = self.lab_input)
@@ -532,7 +462,7 @@ class Seq2SeqAttNN(NN):
             tf.summary.scalar("loss",loss)
         self.softmax_input = sco_mat
     
-    def train(self,sess,epoch, train_data,merged=None, writer=None, threshold_acc=0.99):   
+    def train(self,sess, epoch, train_data, merged=None, writer=None, threshold_acc=0.99):   
         batch = 0
         c = []
         c_kl = []
