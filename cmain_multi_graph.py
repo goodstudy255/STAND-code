@@ -214,7 +214,7 @@ def main(options, modelconf="config/model.conf"):
                     print ("max_recall@{}: ".format(str(cut_off[i])) + str(max_recall[i])+" max_mrr@{}: ".format(str(cut_off[i]))+str(max_mrr[i]))
                 if increase_num==0:
                     epoch_num += 1
-                if epoch_num==5:
+                if epoch_num==10:
                     print("Early stop")
                     sys.exit(0)    
                 test_data.flush()
@@ -277,7 +277,7 @@ def main(options, modelconf="config/model.conf"):
                             print ("max_recall@{}: ".format(str(cut_off[i])) + str(max_recall[i])+" max_mrr@{}: ".format(str(cut_off[i]))+str(max_mrr[i]))
                         if increase_num==0:
                             epoch_num += 1
-                        if epoch_num==5:
+                        if epoch_num==10:
                             print("Early stop")
                             sys.exit(0)    
                         test_data.flush()
