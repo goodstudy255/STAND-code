@@ -11,8 +11,6 @@ kuairand dataset: https://kuairand.com/
 
 movielens dataset: https://grouplens.org/datasets/movielens/
 
-Due to data security protocols, the 'KuaiRand' dataset is accessible only upon submission of an email request. Consequently, we have omitted the preprocessed outcomes for 'KuaiRand'. You can find the preprocessed results for the ML-1M dataset at `./ml_1m`.
-
 Due to varying tag counts associated with each data entry in the 'KuaiRand' and ML-1M datasets, which reflect their unique data acquisition methods, we have crafted a dedicated model file for each. The model path is `./model`.
 
 ---
