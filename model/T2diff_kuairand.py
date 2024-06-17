@@ -217,6 +217,7 @@ class T2diff(NN):
                 KL_loss = tf.math.reduce_mean(tf.sqrt(tf.math.reduce_sum(tf.square(diff-reconstructed_t), axis=-1))) 
 
                 predicted_next = (inputs + reconstructed_t)[:, -1:, :] 
+                predicted_next = tf.stop_gradient(predicted_next)
             else: # inference process
                 KL_loss = None
                 infer_steps = total_steps
