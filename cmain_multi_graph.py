@@ -306,17 +306,16 @@ def main(options, modelconf="config/model.conf"):
             Trainable_params = 0
             NonTrainable_params = 0
 
-            # 遍历tf.global_variables()返回的全局变量列表
             for var in tf.global_variables():
-                shape = var.shape # 获取每个变量的shape，其类型为'tensorflow.python.framework.tensor_shape.TensorShape'
-                array = np.asarray([dim.value for dim in shape]) # 转换为numpy数组，方便后续计算
-                mulValue = np.prod(array) # 使用numpy prod接口计算数组所有元素之积
+                shape = var.shape 
+                array = np.asarray([dim.value for dim in shape]) 
+                mulValue = np.prod(array) 
 
-                Total_params += mulValue # 总参数量
+                Total_params += mulValue 
                 if var.trainable:
-                    Trainable_params += mulValue # 可训练参数量
+                    Trainable_params += mulValue 
                 else:
-                    NonTrainable_params += mulValue # 非可训练参数量
+                    NonTrainable_params += mulValue
 
             print(f'Total params: {Total_params}')
             print(f'Trainable params: {Trainable_params}')
@@ -341,12 +340,12 @@ def main(options, modelconf="config/model.conf"):
                     else:
                         train_model.train(train_sess, train_data, test_data, threshold_acc=config['recsys_threshold_acc'])
                     print('训练时间',time.time()-start)
-                    train_saver = tf.train.Saver()  # max_to_keep=30
+                    train_saver = tf.train.Saver()  
                     train_saver.save(train_sess, train_model_save_path)
                 if test_data != None:
                     with tf.Session(graph=test_graph) as test_sess:
                         test_sess.run(tf.global_variables_initializer())    
-                        test_saver = tf.train.Saver()  # max_to_keep=30
+                        test_saver = tf.train.Saver() 
                         test_saver.restore(test_sess, train_model_save_path)
                         sent_data = test_data
                         start = time.time()
@@ -371,7 +370,6 @@ def main(options, modelconf="config/model.conf"):
                         if increase_num==0:
                             epoch_num += 1
                         if epoch_num==5:
-                            print("长时间指标未增长，训练结束")
                             sys.exit(0)    
                         test_data.flush()
 
