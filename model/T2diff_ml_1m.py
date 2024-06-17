@@ -3,13 +3,8 @@ import numpy as np
 import tensorflow as tf
 import time
 from basic_layer.NN_adam import NN
-from util.Printer import TIPrint
 from util.batcher.equal_len.batcher_p import batcher
 from util.AccCalculater import cau_recall_mrr_org_list
-from util.AccCalculater import cau_samples_recall_mrr
-from util.Pooler import pooler
-from basic_layer.FwNn3AttLayer import FwNnAttLayer
-from util.FileDumpLoad import dump_file
 import sys
 import math
 
@@ -968,8 +963,5 @@ class T2diff(NN):
                     recall[k] += t_r[k]
                     mrr[k] += t_m[k]
                 batch += 1
-        # for k in range(len(self.cut_off)):
-        #     r, m =cau_samples_recall_mrr(test_data.samples,self.cut_off[k])
-        #     print (r,m)
         # print (np.mean(c_loss))
         return  np.mean(recall,axis=1), np.mean(mrr,axis=1)
