@@ -316,23 +316,23 @@ class T2diff(NN):
         lab_input_emb = tf.expand_dims(self.lab_input_emb,1)
 
         extended_input = tf.concat([inputs, lab_input_emb], axis=1)
-        KL_loss, predicted_next = self.diffusion(extended_input[:, : -1, :], extended_input[:, 1: , :], 1)
+        KL_loss, predicted_next = self.diffusion(extended_input[:, : -1, :], extended_input[:, 1: , :], 1) #predict next
         session_inputs = tf.concat([extended_input[:, -11:-1, :], predicted_next], axis=1)
-        history_play_actual_lens = tf.cast(tf.reduce_sum(tf.sign(tf.reduce_max(tf.abs(session_inputs), axis=2, keepdims=True)), axis=1, keepdims=True), tf.float32)
-        session_inputs = self.transformer(session_inputs, history_play_actual_lens, atten_unit=self.edim/head_num, head_num=head_num)
-        session_inputs = tf.math.reduce_mean(session_inputs, 1, True)
+        history_play_actual_lens = tf.cast(tf.reduce_sum(tf.sign(tf.reduce_max(tf.abs(session_inputs), axis=2, keepdims=True)), axis=1, keepdims=True), tf.float32) #zero-mask
+        session_outputs = self.transformer(session_inputs, history_play_actual_lens, atten_unit=self.edim/head_num, head_num=head_num)
+        session_outputs = tf.math.reduce_mean(session_outputs, 1, True)
 
-        din_out  = self.target_attention(session_inputs, extended_input[:, :-11, ])
+        din_out  = self.target_attention(session_outputs, extended_input[:, :-11, ])
         
-        session_inputs = tf.squeeze(session_inputs,axis=1)
+        session_outputs = tf.squeeze(session_outputs,axis=1)
 
-        din_out = tf.concat((din_out,session_inputs),axis = -1)
+        user_emb = tf.concat((din_out,session_outputs),axis = -1)
 
         self.pre_tag = tf.cast(self.pre_tag,tf.float32)
         embe_dict_all_tag = tf.matmul(self.pre_tag[1:],self.embe_dict_tag)/tf.reduce_sum(self.pre_tag[1:],axis=-1,keepdims=True)  
         self.embe_new_dict= tf.concat((self.embe_dict[2:],embe_dict_all_tag),axis=-1)
         self.embe_new_dict = self.simple_dnn(self.embe_new_dict, sub_name="mlp", hidden_units=[2*self.edim]) 
-        sco_mat = tf.matmul(din_out,self.embe_new_dict,transpose_b= True)
+        sco_mat = tf.matmul(user_emb,self.embe_new_dict,transpose_b= True)
         
         with tf.control_dependencies(print_ops):   
             with tf.name_scope('train_loss'):
@@ -413,6 +413,7 @@ class T2diff(NN):
             self.embe_dict_tag *= self.pe_mask_tag
 
         print_ops = []
+        head_num = 2 
         
         inputs_id = tf.nn.embedding_lookup(self.embe_dict, self.inputs,max_norm=1.5)
         inputs_tag = tf.reshape(self.inputs_tags,[-1,tf.shape(self.inputs_tags)[-1]])
@@ -425,20 +426,20 @@ class T2diff(NN):
         lab_input_emb = tf.expand_dims(self.lab_input_emb,1)
 
         extended_input = tf.concat([inputs, lab_input_emb], axis=1)
-        KL_loss, predicted_next = self.diffusion(extended_input[:, : -1, :], extended_input[:, 1: , :], 0)
+        KL_loss, predicted_next = self.diffusion(extended_input[:, : -1, :], extended_input[:, 1: , :], 0) #predict next
         session_inputs = tf.concat([extended_input[:, -11:-1, :], predicted_next], axis=1)
-        history_play_actual_lens = tf.cast(tf.reduce_sum(tf.sign(tf.reduce_max(tf.abs(session_inputs), axis=2, keepdims=True)), axis=1, keepdims=True), tf.float32)
-        session_inputs = self.transformer(session_inputs, history_play_actual_lens, atten_unit=2, head_num=2)
-        session_inputs = tf.math.reduce_mean(session_inputs, 1, True)
-        din_out = self.target_attention(session_inputs, extended_input[:, :-11, ])
-        session_inputs = tf.squeeze(session_inputs,axis=1)
-        din_out = tf.concat((din_out,session_inputs),axis = -1)
+        history_play_actual_lens = tf.cast(tf.reduce_sum(tf.sign(tf.reduce_max(tf.abs(session_inputs), axis=2, keepdims=True)), axis=1, keepdims=True), tf.float32) #zero-mask
+        session_outputs = self.transformer(session_inputs, history_play_actual_lens, atten_unit=self.edim/head_num, head_num=head_num)
+        session_outputs = tf.math.reduce_mean(session_outputs, 1, True)
+        din_out = self.target_attention(session_outputs, extended_input[:, :-11, ])
+        session_outputs = tf.squeeze(session_outputs,axis=1)
+        user_emb = tf.concat((din_out,session_outputs),axis = -1)
 
         self.pre_tag = tf.cast(self.pre_tag,tf.float32)
         embe_dict_all_tag = tf.matmul(self.pre_tag[1:],self.embe_dict_tag)/tf.reduce_sum(self.pre_tag[1:],axis=-1,keepdims=True)  
         self.embe_new_dict= tf.concat((self.embe_dict[2:],embe_dict_all_tag),axis=-1)
         self.embe_new_dict = self.simple_dnn(self.embe_new_dict, sub_name="mlp", hidden_units=[2*self.edim]) 
-        sco_mat = tf.matmul(din_out,self.embe_new_dict,transpose_b= True)
+        sco_mat = tf.matmul(user_emb,self.embe_new_dict,transpose_b= True)
 
         with tf.name_scope('test_loss'):
             self.loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=sco_mat,labels = self.lab_input)

@@ -178,7 +178,7 @@ class T2diff(NN):
             outputs = self.ln(outputs, scope="ln_2")
             return outputs
     
-    def diffusion(self, inputs, input_with_target, is_train, sub_name="diffusion", total_steps=5):
+    def diffusion(self, inputs, input_with_target, is_train, sub_name="diffusion", total_steps=50):
         with tf.variable_scope("%s" % sub_name):
             action_lens = 50
             hidden_dim = inputs.get_shape().as_list()[-1]
