@@ -38,7 +38,6 @@ def load_data_m(train_file, test_file,pad_idx = 0):
         item2tag[int(item)] = [int(x) for x in cate_list]
     tag_num = len(tag_list)
 
-    # item2tag = {}
     users = {}
     interactions = {}
 
@@ -61,9 +60,6 @@ def load_data_m(train_file, test_file,pad_idx = 0):
         item2tag[item] = tag
 
     item_num = len(items2idx.keys())
-    print('items2idx长度为：    ',len(items2idx))
-    print('users长度为：        ',len(users))
-    print('交互次数为：         ',len(interactions))
     return train_data, test_data, items2idx, item_num,item2tag,tag_num
 
 def parse_func(line):
@@ -72,8 +68,6 @@ def parse_func(line):
     pos = int(fields[2])
     tag = fields[3].split(',')
     tag = [int(t) for t in tag]
-    # tag = int(fields[3])
-    # neg = int(fields[4])
     seq = np.array([int(x) for x in fields[1].split(',')])
     assert len(seq) == 50
     return (user, seq, pos, tag)
@@ -83,13 +77,6 @@ def parse_func(line):
 def _load_data(file_path, item2idx, item2tag,idx_cnt,  tag_num, users,interactions, pad_idx=0):
     with open(file_path) as f:
         lines = list(map(parse_func, f.readlines()))
-
-    
-    print("sort finish")
-    # y = list(data.groupby('SessionId'))
-    print("list finish")
-    # tmp_data = dict(y)
-
 
     samplepack = Samplepack()
     samples = []
@@ -101,7 +88,7 @@ def _load_data(file_path, item2idx, item2tag,idx_cnt,  tag_num, users,interactio
 
     for data in lines:
         sample.id = now_id
-        sample.session_id = data[0]   #usr_id
+        sample.session_id = data[0]   
         if data[0] not in users:
             users[data[0]] =1
         item_dixes = []
@@ -136,25 +123,14 @@ def _load_data(file_path, item2idx, item2tag,idx_cnt,  tag_num, users,interactio
             tag_list.append(tag)
             idx_cnt+=1
         sample.out_idxes = [item2idx[data[2]]]
-        # sample.out_idxes = [data[2]]
         sample.out_tag = [tag_list[-1]]
         item_dixes.append(item2idx[data[2]])
-
-        # sample.out_idxes = [data[3]]
         sample.items_idxes = item_dixes
 
         sample.click_items = np.append(data[1],data[2])
         samples.append(sample)
         now_id+=1
         sample = Sample_kuairand()
-        
-        # if data[3] not in tag_dixes:
-        #     if idx_cnt == pad_idx:
-        #         idx_cnt +=1
-        #     item2idx[item] = idx_cnt
-        #     idx_cnt+=1
-        # item_dixes.append(item2idx[item])
-        # sample.in_idxes = item_dixes
 
     print(len(samples))
     samplepack.samples = samples
@@ -169,4 +145,3 @@ if __name__ == '__main__':
     a = defaultdict()
     for item in item2tag:
         a[int(item)] = int(item2tag[item])
-    a =1
