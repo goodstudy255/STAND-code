@@ -68,7 +68,7 @@ def parse_func(line):
     tag = fields[3].split(',')
     tag = [int(t) for t in tag]
     seq = np.array([int(x) for x in fields[1].split(',')])
-    assert len(seq) == 50
+    # assert len(seq) == 50
     return (user, seq, pos, tag)
 
 

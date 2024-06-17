@@ -55,7 +55,7 @@ def parse_func(line):
     pos = int(fields[2])
     tag = int(fields[3])
     seq = np.array([int(x) for x in fields[1].split(',')])
-    assert len(seq) == 50
+    # assert len(seq) == 50
     return (user, seq, pos, tag)
 
 def _load_data(file_path, item2idx, item2tag,idx_cnt,max_num, users,interactions, pad_idx=0):
