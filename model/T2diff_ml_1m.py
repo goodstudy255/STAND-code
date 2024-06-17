@@ -94,7 +94,7 @@ class T2diff(NN):
                 x = tf.layers.dense(x, 1, activation=None, name='linear', use_bias=False, kernel_initializer=tf.glorot_normal_initializer(), reuse=tf.AUTO_REUSE)
         return x 
     
-    def target_attention(self,recent_play, play_history,sub_name="target_attention", debug_name=""):
+    def target_attention(self,recent_play, play_history,sub_name="target_attention"):
         with tf.variable_scope("%s" % sub_name, reuse=tf.AUTO_REUSE):
             recent_play = tf.tile(recent_play, [1, 40, 1])
             din_input = tf.concat([recent_play, play_history, recent_play-play_history, recent_play*play_history], axis=-1) 
@@ -147,7 +147,7 @@ class T2diff(NN):
             outputs = x
             return outputs
     
-    def transformer(self,inputs, inputs_action_len, atten_unit=16, head_num=4, scope_name="transformer", debug_name=""):
+    def transformer(self,inputs, inputs_action_len, atten_unit=16, head_num=4, scope_name="transformer"):
         """
         inputs: user action list, (batch_size x max_action_length x action_dim)
         return concat(inputs, context_info)
