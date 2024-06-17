@@ -13,8 +13,6 @@ from util.FileDumpLoad import dump_file
 import sys
 import math
 
-# 相较于v5，提升了噪声的影响力，修复训练选取t步时不随机的问题
-
 class Seq2SeqAttNN(NN):
     """
     The memory network with context attention.
@@ -138,7 +136,7 @@ class Seq2SeqAttNN(NN):
     def target_attention(self,recent_play, play_history,sub_name="target_attention", debug_name=""):
         with tf.variable_scope("%s" % sub_name, reuse=tf.AUTO_REUSE):
             recent_play = tf.tile(recent_play, [1, 40, 1])
-            din_input = tf.concat([recent_play, play_history, recent_play-play_history, recent_play*play_history], axis=-1) # [B, history_lens, 4*input_dims]
+            din_input = tf.concat([recent_play, play_history, recent_play-play_history, recent_play*play_history], axis=-1)
             din_output = self.simple_dnn(din_input, hidden_units=[self.edim], single_output=True, sub_name="din")
             din_output = tf.nn.softmax(din_output, axis=1)
             return tf.reduce_sum(din_output*play_history, axis=1, keepdims=False)
@@ -148,15 +146,9 @@ class Seq2SeqAttNN(NN):
         return tf.get_variable(var_name, shape=(input_dim, output_dim), initializer=initializer)
 
     def unet(self,keys,  num_layers=3, out_dims=4, scope="unet"):
-        """
-        对输入的action_list长度敏感, 需要确认corp_size都为整数。
-        """
         with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
             num_conv_per_layer = 1
             num_of_steps= 50
-            # print("unet mask shape:", key_masks.get_shape())
-
-            # compute padding & corp size
             corp_size = [num_of_steps + num_conv_per_layer*2]
             for _ in range(num_layers-1):
                 corp_size.append(corp_size[-1]/2 + num_conv_per_layer*2)
@@ -166,10 +158,8 @@ class Seq2SeqAttNN(NN):
                 filters = [out_dims]
             for _ in range(num_layers-1):
                 filters.append(filters[-1]*2)
-            #前后拼接一部分镜像序列
             padding_size = int((full_size[0] - num_of_steps) / 2)
             inputs = tf.concat([tf.reverse(keys[:, :padding_size, :], axis=[1]),keys, tf.reverse(keys[:, -padding_size:, :], axis=[1])], axis=1)
-            # top down
             left_blocks = []
             x = inputs
             for i in range(num_layers):
@@ -180,20 +170,20 @@ class Seq2SeqAttNN(NN):
                     x = self.ln(x, scope="down_ln_%d_%d"%(i, j))
                 left_blocks.append(x)
                 if i != num_layers-1:
-                    x = tf.layers.max_pooling1d(x, pool_size=2, strides=2, padding='valid') # 下采样
-            # print('bottom tmp shape:%s'%x.get_shape())
+                    x = tf.layers.max_pooling1d(x, pool_size=2, strides=2, padding='valid') 
+
             for i in range(num_layers-2, -1, -1):
                 edge_size = int((full_size[i] - num_conv_per_layer*2 - corp_size[i]) / 2)
-                x = tf.keras.layers.UpSampling1D(size=2)(x) # 上采样
+                x = tf.keras.layers.UpSampling1D(size=2)(x) # 
                 x = tf.layers.conv1d(x, filters=filters[i], kernel_size=1, strides=1, padding='valid', activation=None, kernel_regularizer=tf.keras.regularizers.l1_l2())
                 x = tf.nn.swish(x)
-                x = tf.concat([x, left_blocks[i][:, edge_size: -edge_size, :]], axis=-1) # 拼接裁剪后的低维信息
+                x = tf.concat([x, left_blocks[i][:, edge_size: -edge_size, :]], axis=-1) 
                 for j in range(num_conv_per_layer):
                     x = tf.layers.conv1d(x, filters=filters[i], kernel_size=3, strides=1, padding='valid', activation=None, kernel_regularizer=tf.keras.regularizers.l1_l2())
                     x = tf.nn.swish(x)
                     x = self.ln(x, scope="up_ln_%d_%d"%(i, j))
             outputs = x
-            # print('unet output shape:%s'%outputs.get_shape())
+
             return outputs
     
     def self_attention(self,inputs, inputs_action_len, atten_unit=16, head_num=4, scope_name="self_attention", debug_name=""):
@@ -203,52 +193,47 @@ class Seq2SeqAttNN(NN):
         """
         action_dim = inputs.get_shape().as_list()[-1]
         with tf.variable_scope(scope_name, reuse= tf.AUTO_REUSE):
-            Q = self.get_norm_variable("Q_mat", action_dim, atten_unit * head_num) #(action_dim, atten_unit * head_num)
-            K = self.get_norm_variable("K_mat", action_dim, atten_unit * head_num) #(action_dim, atten_unit * head_num)
-            V = self.get_norm_variable("V_mat", action_dim, atten_unit * head_num) #(action_dim, atten_unit * head_num)
-            q = tf.tensordot(inputs, Q, axes=(-1,0)) #(batch_size, max_action_length, atten_unit * head_num)
-            k = tf.tensordot(inputs, K, axes=(-1,0)) #(batch_size, max_action_length, atten_unit * head_num)
-            v = tf.tensordot(inputs, V, axes=(-1,0)) #(batch_size, max_action_length, atten_unit * head_num)
-            q = tf.concat(tf.split(q, head_num, axis=2), axis=0) #(head_num*batch_size, max_action_length, atten_unit)
-            k = tf.concat(tf.split(k, head_num, axis=2), axis=0) #(head_num*batch_size, max_action_length, atten_unit)
-            v = tf.concat(tf.split(v, head_num, axis=2), axis=0) #(head_num*batch_size, max_action_length, atten_unit)
-            inner_product = tf.matmul(q, k, transpose_b=True) / np.sqrt(atten_unit) #(head_num*batch_size, max_action_length, max_action_length)
+            Q = self.get_norm_variable("Q_mat", action_dim, atten_unit * head_num) 
+            K = self.get_norm_variable("K_mat", action_dim, atten_unit * head_num) 
+            V = self.get_norm_variable("V_mat", action_dim, atten_unit * head_num) 
+            q = tf.tensordot(inputs, Q, axes=(-1,0)) 
+            k = tf.tensordot(inputs, K, axes=(-1,0)) 
+            v = tf.tensordot(inputs, V, axes=(-1,0)) 
+            q = tf.concat(tf.split(q, head_num, axis=2), axis=0) 
+            k = tf.concat(tf.split(k, head_num, axis=2), axis=0) 
+            v = tf.concat(tf.split(v, head_num, axis=2), axis=0) 
+            inner_product = tf.matmul(q, k, transpose_b=True) / np.sqrt(atten_unit) 
             inner_product = tf.matrix_set_diag(inner_product, tf.ones_like(inner_product)[:,:,0] * (-2 ** 32 + 1))
-            inner_product = tf.nn.softmax(inner_product) #(head_num * batch_size, max_action_length, max_action_length)
+            inner_product = tf.nn.softmax(inner_product) 
             
-            outputs = tf.matmul(inner_product, v) #(head_num*batch_size, max_action_length, atten_unit)
-            outputs = tf.concat(tf.split(outputs, head_num, axis=0), axis=2) #(batch_size, max_action_length, atten_unit * head_num)
+            outputs = tf.matmul(inner_product, v) 
+            outputs = tf.concat(tf.split(outputs, head_num, axis=0), axis=2) 
             outputs = tf.layers.dense(outputs, action_dim, name='linear', use_bias=False, kernel_initializer=tf.glorot_normal_initializer(), reuse=tf.AUTO_REUSE) # linear
-            outputs += inputs # add
-            outputs = self.ln(outputs, scope="ln_1") # norm
-            ffn_outputs = self.simple_dnn(outputs, hidden_units=[action_dim]) # ffn
-            outputs += ffn_outputs # add
-            outputs = self.ln(outputs, scope="ln_2") # norm
+            outputs += inputs
+            outputs = self.ln(outputs, scope="ln_1") 
+            ffn_outputs = self.simple_dnn(outputs, hidden_units=[action_dim]) 
+            outputs += ffn_outputs 
+            outputs = self.ln(outputs, scope="ln_2")
             return outputs
     
     def multi_head_attention(self, inputs, query, inputs_action_len, atten_unit=16, head_num=4, scope_name="multi_head_attention"):
         action_dim = 50
         max_action_len = inputs.get_shape().as_list()[1]
         with tf.variable_scope(scope_name):
-            mask = tf.cast(tf.sequence_mask(tf.reshape(inputs_action_len, [-1]), max_action_len), tf.float32) #(batch_size, max_action_length)
-            Q = self.get_norm_variable("Q_mat", action_dim, atten_unit * head_num) #(action_dim, atten_unit * head_num)
-            K = self.get_norm_variable("K_mat", action_dim, atten_unit * head_num) #(action_dim, atten_unit * head_num)
-            V = self.get_norm_variable("V_mat", action_dim, atten_unit * head_num) #(action_dim, atten_unit * head_num)
-            q = tf.tensordot(query, Q, axes=(-1,0)) #(batch_size, max_action_length, atten_unit * head_num)
-            k = tf.tensordot(inputs, K, axes=(-1,0)) #(batch_size, max_action_length, atten_unit * head_num)
-            v = tf.tensordot(inputs, V, axes=(-1,0)) #(batch_size, max_action_length, atten_unit * head_num)
-            q = tf.concat(tf.split(q, head_num, axis=2), axis=0) #(head_num*batch_size, max_action_length, atten_unit)
-            k = tf.concat(tf.split(k, head_num, axis=2), axis=0) #(head_num*batch_size, max_action_length, atten_unit)
-            v = tf.concat(tf.split(v, head_num, axis=2), axis=0) #(head_num*batch_size, max_action_length, atten_unit)
-            inner_product = tf.matmul(q, k, transpose_b=True) / np.sqrt(atten_unit) #(head_num*batch_size, max_action_length, max_action_length)
-            # mask = tf.tile(mask, [head_num, 1]) #(head_num * batch_size, max_action_length)
-            # mask = tf.tile(tf.expand_dims(mask, 1), [1, max_action_len, 1]) #(head_num * batch_size, max_action_length, max_action_length)
-            # padding = tf.ones_like(inner_product) * (-2 ** 32 + 1)
-            # inner_product = tf.matrix_set_diag(inner_product, tf.ones_like(inner_product)[:,:,0] * (-2 ** 32 + 1))
-            # inner_product = tf.where(tf.equal(mask, 1), inner_product, padding)
-            inner_product = tf.nn.softmax(inner_product) #(head_num * batch_size, max_action_length, max_action_length)
-            outputs = tf.matmul(inner_product, v) #(head_num*batch_size, max_action_length, atten_unit)
-            outputs = tf.concat(tf.split(outputs, head_num, axis=0), axis=2) #(batch_size, max_action_length, atten_unit * head_num)
+            mask = tf.cast(tf.sequence_mask(tf.reshape(inputs_action_len, [-1]), max_action_len), tf.float32)
+            Q = self.get_norm_variable("Q_mat", action_dim, atten_unit * head_num) 
+            K = self.get_norm_variable("K_mat", action_dim, atten_unit * head_num) 
+            V = self.get_norm_variable("V_mat", action_dim, atten_unit * head_num) 
+            q = tf.tensordot(query, Q, axes=(-1,0)) 
+            k = tf.tensordot(inputs, K, axes=(-1,0)) 
+            v = tf.tensordot(inputs, V, axes=(-1,0))
+            q = tf.concat(tf.split(q, head_num, axis=2), axis=0) 
+            k = tf.concat(tf.split(k, head_num, axis=2), axis=0) 
+            v = tf.concat(tf.split(v, head_num, axis=2), axis=0)
+            inner_product = tf.matmul(q, k, transpose_b=True) / np.sqrt(atten_unit) 
+            inner_product = tf.nn.softmax(inner_product) 
+            outputs = tf.matmul(inner_product, v) 
+            outputs = tf.concat(tf.split(outputs, head_num, axis=0), axis=2) 
             outputs = tf.layers.dense(outputs, action_dim, name='linear', use_bias=False, kernel_initializer=tf.glorot_normal_initializer(), reuse=tf.AUTO_REUSE) # linear
             outputs = self.ln(outputs, scope="attention_ln") 
             return outputs
@@ -260,20 +245,18 @@ class Seq2SeqAttNN(NN):
             inputs = tf.stop_gradient(inputs)
             input_with_target = tf.stop_gradient(input_with_target)
             a, b = 1e-2, 4.5
-            alphas, betas, alpha_hats, beta_hats = [], [], [], [] # 控制加噪声的大小，beta越大噪声越大
+            alphas, betas, alpha_hats, beta_hats = [], [], [], [] 
             for s in range(1, total_steps+1):
-                beta = a*math.exp(b*s/total_steps) #exponential schedule
+                beta = a*math.exp(b*s/total_steps)
                 betas.append(beta)
                 alphas.append(1-beta)
                 alpha_hats.append(1-beta) if s == 1 else alpha_hats.append((1-beta)*alpha_hats[-1])
                 beta_hats.append(0) if s == 1 else beta_hats.append((1-alpha_hats[-2])/(1-alpha_hats[-1])*beta)
 
             step_weight = 1e-2
-            step_embs = [[math.sin(t/2**f) for f in range(hidden_dim*2)] for t in range(1, total_steps+1)] # 提示模型处于第t步
+            step_embs = [[math.sin(t/2**f) for f in range(hidden_dim*2)] for t in range(1, total_steps+1)] 
             
             if is_train==1:
-                # train graph
-                # t = np.random.randint(low=1, high=total_steps)
                 t = tf.random.uniform(shape=[tf.shape(inputs)[0]], minval=0, maxval=total_steps, dtype=tf.int32)
                 diff = input_with_target - inputs
 
@@ -282,40 +265,28 @@ class Seq2SeqAttNN(NN):
                 alpha_hats = tf.gather(alpha_hats, t, axis=0)
                 alpha_hats = tf.expand_dims(tf.expand_dims(alpha_hats, axis=1), axis=2)
                 alpha_hats = tf.tile(alpha_hats, [1, action_lens, hidden_dim])
-                noised_t_input = tf.sqrt(alpha_hats)*diff + tf.sqrt(1-alpha_hats)*gaussian_noise # 加入t步高斯噪声
-                # noised_t_input = tf.sqrt(alpha_hats[t])*diff + tf.sqrt(1-alpha_hats[t])*gaussian_noise # 加入t步高斯噪声
+                noised_t_input = tf.sqrt(alpha_hats)*diff + tf.sqrt(1-alpha_hats)*gaussian_noise
                 noised_t_input = tf.concat((noised_t_input, inputs),axis=-1)
 
-                # step_emb = tf.convert_to_tensor(step_embs[t], dtype=tf.float32)
                 step_emb = tf.convert_to_tensor(step_embs, dtype=tf.float32)
                 step_emb = tf.gather(step_emb, t, axis=0)
                 step_emb = tf.expand_dims(step_emb, axis=1)
                 step_emb = tf.tile(step_emb, [1, action_lens, 1])
-                reconstructed_t = self.unet(noised_t_input + step_weight*step_emb, num_layers=4, out_dims=hidden_dim) # 重建为x0 x-prediction
+                reconstructed_t = self.unet(noised_t_input + step_weight*step_emb, num_layers=4, out_dims=hidden_dim) 
 
-                # origin_diff_norm = tf.sqrt(tf.reduce_sum(tf.square(diff), 1, True))
-                # new_diff_norm = tf.sqrt(tf.reduce_sum(tf.square(reconstructed_t), 1, True))
-                # diff_prod = tf.reduce_sum(tf.multiply(diff, reconstructed_t), 1, True)
-                # diff_norm_prod = tf.multiply(origin_diff_norm, new_diff_norm)
-                # cos_sim_diff = tf.truediv(diff_prod, diff_norm_prod+1e-5)
-                # KL_loss = tf.math.reduce_mean(1-cos_sim_diff)
-                KL_loss = tf.math.reduce_mean(tf.sqrt(tf.math.reduce_sum(tf.square(diff-reconstructed_t), axis=-1))) # 实际简化为mse_loss
+                KL_loss = tf.math.reduce_mean(tf.sqrt(tf.math.reduce_sum(tf.square(diff-reconstructed_t), axis=-1))) 
 
-                predicted_next = (inputs + reconstructed_t)[:, -1:, :] # [B, h]
-                # predicted_next = tf.stop_gradient(predicted_next)
+                predicted_next = (inputs + reconstructed_t)[:, -1:, :] 
             else:
-                # test graph
                 KL_loss = None
                 infer_steps = total_steps
                 gaussian_noise_diffu = tf.random.normal(shape=tf.shape(inputs), mean=0, stddev=1)
-                # diff = input_with_target - inputs
-                # noised_t = tf.concat([diff[:, 1:, :], gaussian_noise_diffu[:, -1:, :]], axis=1)
                 noised_t = gaussian_noise_diffu
                 for t in range(infer_steps-1, -1, -1): 
                     noised_t_input = tf.concat((noised_t,inputs),axis = -1)                
                     
                     step_emb = tf.convert_to_tensor(step_embs[t], dtype=tf.float32)
-                    reconstructed_t = self.unet(noised_t_input + step_weight*step_emb, num_layers=4, out_dims=hidden_dim) # 重建为x0 x-prediction
+                    reconstructed_t = self.unet(noised_t_input + step_weight*step_emb, num_layers=4, out_dims=hidden_dim)
                     if t == 0:
                         noised_t = reconstructed_t
                     else:
@@ -370,10 +341,6 @@ class Seq2SeqAttNN(NN):
             [None],
             name="lab_input_tag"
         )
-
-        # self.lab_input = tf.concat((self.lab_input,self.lab_input_tag),axis=0)
-
-        # the lookup dict.
         with tf.variable_scope('model'):
             self.embe_dict = tf.Variable(
                 self.pre_embedding,
@@ -416,45 +383,24 @@ class Seq2SeqAttNN(NN):
         lab_input_emb = tf.concat((lab_input_emb,lab_input_tag_emb),axis=-1)
         lab_input_emb = tf.expand_dims(lab_input_emb,1)
 
-        # batch_size = tf.shape(self.inputs)[0]
-        # pool_out = pooler(
-        #     inputs,
-        #     'mean',
-        #     axis=1,
-        #     sequence_length = tf.cast(tf.reshape(self.sequence_length,[batch_size, 1]), tf.float32)
-        # )
-        # pool_out = tf.reshape(pool_out,[-1,self.hidden_size*2])
         extended_input = tf.concat([inputs, lab_input_emb], axis=1)
-        # extended_input = self.simple_dnn(extended_input, sub_name="mlp", hidden_units=[4]) 
         KL_loss, predicted_next = self.diffusion(extended_input[:, : -1, :], extended_input[:, 1: , :], 1)
         
         print('predicted_next: ',predicted_next.shape)
         session_inputs = tf.concat([extended_input[:, -11:-1, :], predicted_next], axis=1)
-        # session_inputs = extended_input[:, -11: -1, :]
         history_play_actual_lens = tf.cast(tf.reduce_sum(tf.sign(tf.reduce_max(tf.abs(session_inputs), axis=2, keepdims=True)), axis=1, keepdims=True), tf.float32)
         session_inputs = self.self_attention(session_inputs, history_play_actual_lens, atten_unit=self.edim//2, head_num=2)
         session_inputs = tf.math.reduce_mean(session_inputs, 1, True)
-        # din_out = session_inputs[:, -1, :]
-        # din_out = pool_out
-
         din_out  = self.target_attention(session_inputs, extended_input[:, :-11, ])
         
         session_inputs = tf.squeeze(session_inputs,axis=1)
 
         din_out = tf.concat((din_out,session_inputs),axis = -1)
 
-        # self.w1 = tf.Variable(
-        #     tf.random_normal([self.edim, self.edim], stddev=self.stddev),
-        #     trainable=True
-        # )
-        
-        # din_out = tf.tanh(tf.matmul(session_inputs,self.w1))
 
         self.embe_new_dict= tf.concat((self.embe_dict[1:],embe_dict_all_tag),axis=-1)
         self.embe_new_dict = self.simple_dnn(self.embe_new_dict, sub_name="mlp", hidden_units=[2*self.edim]) 
         sco_mat = tf.matmul(din_out,self.embe_new_dict,transpose_b= True)
-        # predicted_next = tf.squeeze(predicted_next, axis=1)
-        # sco_mat = tf.matmul(predicted_next,self.embe_new_dict,transpose_b= True)
         
         with tf.control_dependencies(print_ops):   
             with tf.name_scope('train_loss'):
@@ -469,7 +415,7 @@ class Seq2SeqAttNN(NN):
                     tf.summary.scalar("KL_loss",KL_loss)
                     self.loss = self.loss + 10*self.loss_kl+ce_loss
             self.softmax_input = sco_mat
-            # the optimize.
+
             self.params = tf.trainable_variables()
             self.optimize = self.optimize_normal(
                 self.loss, self.params)
@@ -478,7 +424,6 @@ class Seq2SeqAttNN(NN):
         '''
         build the MemNN model
         '''
-        # the input.
         print('测试')
         
         self.inputs = tf.placeholder(
@@ -521,7 +466,6 @@ class Seq2SeqAttNN(NN):
             name="lab_input_tag"
         )
 
-        # the lookup dict.
         with tf.variable_scope('model'):
             self.embe_dict = tf.Variable(
                 self.pre_embedding,
@@ -563,24 +507,14 @@ class Seq2SeqAttNN(NN):
         lab_input_emb = tf.concat((lab_input_emb,lab_input_tag_emb),axis=-1)
         lab_input_emb = tf.expand_dims(lab_input_emb,1)
 
-        # batch_size = tf.shape(self.inputs)[0]
-        # pool_out = pooler(
-        #     inputs,
-        #     'mean',
-        #     axis=1,
-        #     sequence_length = tf.cast(tf.reshape(self.sequence_length,[batch_size, 1]), tf.float32)
-        # )
-        # pool_out = tf.reshape(pool_out,[-1,self.hidden_size*2])
+
         extended_input = tf.concat([inputs, lab_input_emb], axis=1)
-        # extended_input = self.simple_dnn(extended_input, sub_name="mlp", hidden_units=[4]) 
         KL_loss, predicted_next = self.diffusion(extended_input[:, : -1, :], extended_input[:, 1: , :], 0)
         session_inputs = tf.concat([extended_input[:, -11: -1, :], predicted_next], axis=1)
-        # session_inputs = extended_input[:, : -1, :]
         history_play_actual_lens = tf.cast(tf.reduce_sum(tf.sign(tf.reduce_max(tf.abs(session_inputs), axis=2, keepdims=True)), axis=1, keepdims=True), tf.float32)
         session_inputs = self.self_attention(session_inputs, history_play_actual_lens, atten_unit=self.edim//2, head_num=2)
         session_inputs = tf.math.reduce_mean(session_inputs, 1, True)
-        # din_out = session_inputs[:, -1, :]
-        # din_out = pool_out
+
 
         din_out  = self.target_attention(session_inputs, extended_input[:, :-11, ])
         
@@ -588,17 +522,8 @@ class Seq2SeqAttNN(NN):
 
         din_out = tf.concat((din_out,session_inputs),axis = -1)
 
-        # self.w1 = tf.Variable(
-        #     tf.random_normal([self.edim, self.edim], stddev=self.stddev),
-        #     trainable=True
-        # )
-        
-        # din_out = tf.tanh(tf.matmul(session_inputs,self.w1))
-
         self.embe_new_dict= tf.concat((self.embe_dict[1:],embe_dict_all_tag),axis=-1)
         self.embe_new_dict = self.simple_dnn(self.embe_new_dict, sub_name="mlp", hidden_units=[2*self.edim]) 
-        # predicted_next = tf.squeeze(predicted_next, axis=1)
-        # sco_mat = tf.matmul(predicted_next,self.embe_new_dict,transpose_b= True)
         sco_mat = tf.matmul(din_out,self.embe_new_dict,transpose_b= True)
 
         with tf.name_scope('test_loss'):
@@ -611,17 +536,14 @@ class Seq2SeqAttNN(NN):
         batch = 0
         c = []
         c_kl = []
-        cost = 0.0  # the cost of each epoch.
+        cost = 0.0  
         bt = batcher(
             samples=train_data.samples,
             class_num= self.n_items,
             random=True
         )
-        while bt.has_next():    # batch round.
-            # get this batch data
+        while bt.has_next():   
             batch_data = bt.next_batch()
-            # build the feed_dict
-            # for x,y in zip(batch_data['in_idxes'],batch_data['out_idxes']):
             batch_lenth = len(batch_data['in_idxes'])
             event = len(batch_data['in_idxes'][0])
 
@@ -643,7 +565,6 @@ class Seq2SeqAttNN(NN):
                     for tmp_in, tmp_out in zip(tmp_in_data, tmp_out_data):
                         _in = tmp_in[-1]
                         _out = int(np.mean(tmp_out))
-                        # _out = tmp_out[0]
                         batch_last.append(_in)
                         batch_in.append(tmp_in)
                         batch_out.append(_out)
@@ -655,7 +576,6 @@ class Seq2SeqAttNN(NN):
                     for tmp_in, tmp_out in zip(tmp_in_tags, tmp_out_tags):
                         _in = tmp_in[-1]
                         _out = int(np.mean(tmp_out))
-                        # _out = tmp_out[0]
                         batch_last_tags.append(_in)
                         batch_in_tags.append(tmp_in)
                         batch_out_tags.append(_out)
@@ -669,7 +589,6 @@ class Seq2SeqAttNN(NN):
                         self.lab_input_tag: batch_out_tags
                     }
                     self.batch_size_ = len(batch_in)
-                    # train
                     crt_loss, crt_step, opt = sess.run(
                         [self.loss, self.global_step, self.optimize],
                         feed_dict=feed_dict
@@ -681,12 +600,10 @@ class Seq2SeqAttNN(NN):
                     batch += 1
                     i += self.batch_size
                 if remain > 0:
-                    # print (i, remain)
                     tmp_in_data = batch_data['in_idxes'][i:]
                     tmp_out_data = batch_data['out_idxes'][i:]
                     tmp_in_tags = batch_data['in_tags'][i:]
                     tmp_out_tags = batch_data['out_tags'][i:]
-                    # for s in range(len(tmp_in_data[0])):
                     batch_in = []
                     batch_out = []
                     batch_last = []
@@ -694,7 +611,6 @@ class Seq2SeqAttNN(NN):
                     for tmp_in, tmp_out in zip(tmp_in_data, tmp_out_data):
                         _in = tmp_in[-1]
                         _out = int(np.mean(tmp_out))
-                        # _out = tmp_out[0]
                         batch_last.append(_in)
                         batch_in.append(tmp_in)
                         batch_out.append(_out)
@@ -705,7 +621,6 @@ class Seq2SeqAttNN(NN):
                     for tmp_in, tmp_out in zip(tmp_in_tags, tmp_out_tags):
                         _in = tmp_in[-1]
                         _out = int(np.mean(tmp_out))
-                        # _out = tmp_out[0]
                         batch_last_tags.append(_in)
                         batch_in_tags.append(tmp_in)
                         batch_out_tags.append(_out)
@@ -719,26 +634,22 @@ class Seq2SeqAttNN(NN):
                         self.last_inputs_tags: batch_last_tags,
                         self.lab_input_tag: batch_out_tags
                     }
-                    # train
+                    
                     self.batch_size_ = len(batch_in)
                     crt_loss, crt_step, opt = sess.run(
                         [self.loss, self.global_step, self.optimize],
                         feed_dict=feed_dict
                     )
                     graph = sess.run(merged,feed_dict=feed_dict)
-                    # tf.summary.scalar("train_loss",crt_loss)
                     writer.add_summary(graph,batch+max_length*epoch)
-                    # cost = np.mean(crt_loss)
                     c += list(crt_loss)
-                    # print("Batch:" + str(batch) + ",cost:" + str(cost))
                     batch += 1
             else:
                 max_length = 1
                 tmp_in_data = batch_data['in_idxes']
                 tmp_out_data = batch_data['out_idxes']
-                tmp_in_tags = batch_data['in_tags'] #[i:i+self.batch_size]
-                tmp_out_tags = batch_data['out_tags']  #[i:i+self.batch_size]
-                # for s in range(len(tmp_in_data[0])):
+                tmp_in_tags = batch_data['in_tags'] 
+                tmp_out_tags = batch_data['out_tags']  
                 batch_in = []
                 batch_out = []
                 batch_last = []
@@ -746,7 +657,6 @@ class Seq2SeqAttNN(NN):
                 for tmp_in, tmp_out in zip(tmp_in_data, tmp_out_data):
                     _in = tmp_in[-1]
                     _out = int(np.mean(tmp_out))
-                    # _out = tmp_out[0]
                     batch_last.append(_in)
                     batch_in.append(tmp_in)
                     batch_out.append(_out)
@@ -757,7 +667,6 @@ class Seq2SeqAttNN(NN):
                 for tmp_in, tmp_out in zip(tmp_in_tags, tmp_out_tags):
                     _in = tmp_in[-1]
                     _out = int(np.mean(tmp_out))
-                    # _out = tmp_out[0]
                     batch_last_tags.append(_in)
                     batch_in_tags.append(tmp_in)
                     batch_out_tags.append(_out)
@@ -771,20 +680,16 @@ class Seq2SeqAttNN(NN):
                     self.lab_input_tag: batch_out_tags
                 }
                 self.batch_size_ = len(batch_in)
-                # train
+
                 crt_loss, crt_step, opt = sess.run(
                     [self.loss, self.global_step, self.optimize],
                     feed_dict=feed_dict
                 )
                 graph = sess.run(merged,feed_dict=feed_dict)
-                # tf.summary.scalar("train_loss",crt_loss)
                 writer.add_summary(graph,batch+max_length*epoch)
 
-                # cost = np.mean(crt_loss)
                 c += list(crt_loss)
-                # print("Batch:" + str(batch) + ",cost:" + str(cost))
                 batch += 1
-        # train_acc = self.test(sess,train_data)
         avgc = np.mean(c)
         if np.isnan(avgc):
             print('Epoch {}: NaN error!'.format(str(epoch)))
@@ -794,8 +699,6 @@ class Seq2SeqAttNN(NN):
             
 
     def test(self,sess,test_data):
-        # calculate the acc
-        # print('Measuring Recall@{} and MRR@{}'.format(self.cut_off, self.cut_off))
         self.train_flag = False
         mrr, recall = [], []
         for i in range(len(self.cut_off)):
@@ -809,14 +712,8 @@ class Seq2SeqAttNN(NN):
             class_num = self.n_items,
             random = False
         )
-        # merged = tf.summary.merge_all()
-        # writer = tf.summary.FileWriter("loss_log/", sess.graph)
-        # summary_merge = tf.summary.merge_all() 
-        while bt.has_next():    # batch round.
-            # get this batch data
+        while bt.has_next():   
             batch_data = bt.next_batch()
-            # build the feed_dict
-            # for x,y in zip(batch_data['in_idxes'],batch_data['out_idxes']):
             batch_lenth = len(batch_data['in_idxes'])
             event = len(batch_data['in_idxes'][0])
             if batch_lenth > self.batch_size:
@@ -831,17 +728,12 @@ class Seq2SeqAttNN(NN):
                     tmp_in_tags = batch_data['in_tags'][i:i+self.batch_size]
                     tmp_out_tags = batch_data['out_tags'][i:i+self.batch_size]
 
-                    
-                    # for s in range(len(tmp_in_data[0])):
                     batch_in = []
                     batch_out = []
                     batch_last = []
                     batch_seq_l = []
                     for tmp_in, tmp_out in zip(tmp_in_data, tmp_out_data):
-                        # tmp_in = [i-1 for i in tmp_in]
-                        # tmp_out = [i-1 for i in tmp_out]
                         _in = tmp_in[-1]
-                        # _out = int(np.mean(tmp_out))
                         _out = tmp_out[0]
                         batch_last.append(_in)
                         batch_in.append(tmp_in)
@@ -852,10 +744,7 @@ class Seq2SeqAttNN(NN):
                     batch_out_tags = []
                     batch_last_tags = []
                     for tmp_in, tmp_out in zip(tmp_in_tags, tmp_out_tags):
-                        # tmp_in = [i-1 for i in tmp_in]
-                        # tmp_out = [i-1 for i in tmp_out]
                         _in = tmp_in[-1]
-                        # _out = int(np.mean(tmp_out))
                         _out = tmp_out[0]
                         batch_last_tags.append(_in)
                         batch_in_tags.append(tmp_in)
@@ -872,18 +761,12 @@ class Seq2SeqAttNN(NN):
                         self.lab_input_tag: batch_out_tags
                     }
                     self.batch_size_ = len(batch_in)
-                    # train
                     preds, loss = sess.run(
                         [self.softmax_input, self.loss],
                         feed_dict=feed_dict
                     )
-                    # graph = sess.run(merged,feed_dict=feed_dict)
-                    # writer.add_summary(graph,batch)
                     t_r, t_m, ranks = cau_recall_mrr_org_list(preds, batch_out, cutoff=self.cut_off)
-                    # test_data.pack_ext_matrix('alpha', alpha, tmp_batch_ids)
                     test_data.pack_preds(ranks, tmp_batch_ids)
-                    # tf.summary.scalar("test_loss",loss)
-                    # writer.add_summary(graph,batch)
                     c_loss += list(loss)
                     for k in range(len(self.cut_off)):
                         recall[k] += t_r[k]
@@ -891,23 +774,18 @@ class Seq2SeqAttNN(NN):
                     batch += 1
                 i += self.batch_size
                 if remain > 0:
-                    # print (i, remain)
                     tmp_in_data = batch_data['in_idxes'][i:]
                     tmp_out_data = batch_data['out_idxes'][i:]
                     tmp_batch_ids = batch_data['batch_ids'][i:]
 
                     tmp_in_tags = batch_data['in_tags'][i:]
                     tmp_out_tags = batch_data['out_tags'][i:]
-                    # for s in range(len(tmp_in_data[0])):
                     batch_in = []
                     batch_out = []
                     batch_last = []
                     batch_seq_l = []
                     for tmp_in, tmp_out in zip(tmp_in_data, tmp_out_data):
-                        # tmp_in = [i-1 for i in tmp_in]
-                        # tmp_out = [i-1 for i in tmp_out]
                         _in = tmp_in[-1]
-                        # _out = int(np.mean(tmp_out))
                         _out = tmp_out[0]
                         batch_last.append(_in)
                         batch_in.append(tmp_in)
@@ -917,10 +795,7 @@ class Seq2SeqAttNN(NN):
                     batch_out_tags = []
                     batch_last_tags = []
                     for tmp_in, tmp_out in zip(tmp_in_tags, tmp_out_tags):
-                        # tmp_in = [i-1 for i in tmp_in]
-                        # tmp_out = [i-1 for i in tmp_out]
                         _in = tmp_in[-1]
-                        # _out = int(np.mean(tmp_out))
                         _out = tmp_out[0]
                         batch_last_tags.append(_in)
                         batch_in_tags.append(tmp_in)
@@ -935,41 +810,29 @@ class Seq2SeqAttNN(NN):
                         self.lab_input_tag: batch_out_tags
                     }
                     self.batch_size_ = len(batch_in)
-                    # train
                     preds, loss = sess.run(
                         [self.softmax_input, self.loss],
                         feed_dict=feed_dict
                     )
-                    # graph = sess.run(merged,feed_dict=feed_dict)
-                    # writer.add_summary(graph,batch)
                     t_r, t_m, ranks = cau_recall_mrr_org_list(preds, batch_out, cutoff=self.cut_off)
-                    # test_data.pack_ext_matrix('alpha', alpha, tmp_batch_ids)
                     test_data.pack_preds(ranks, tmp_batch_ids)
-                    # tf.summary.scalar("test_loss",loss)
-                    # writer.add_summary(graph,batch)
                     c_loss += list(loss)
                     for k in range(len(self.cut_off)):
                         recall[k] += t_r[k]
                         mrr[k] += t_m[k]
-                    # recall += t_r
-                    # mrr += t_m
                     batch += 1
             else:
                 tmp_in_data = batch_data['in_idxes']
                 tmp_out_data = batch_data['out_idxes']
                 tmp_batch_ids = batch_data['batch_ids']
-                tmp_in_tags = batch_data['in_tags'] #[i:i+self.batch_size]
-                tmp_out_tags = batch_data['out_tags'] #[i:i+self.batch_size]
-                # for s in range(len(tmp_in_data[0])):
+                tmp_in_tags = batch_data['in_tags'] 
+                tmp_out_tags = batch_data['out_tags']
                 batch_in = []
                 batch_out = []
                 batch_last = []
                 batch_seq_l = []
                 for tmp_in, tmp_out in zip(tmp_in_data, tmp_out_data):
-                    # tmp_in = [i-1 for i in tmp_in]
-                    # tmp_out = [i-1 for i in tmp_out]
                     _in = tmp_in[-1]
-                    # _out = int(np.mean(tmp_out))
                     _out = tmp_out[0]
                     batch_last.append(_in)
                     batch_in.append(tmp_in)
@@ -979,10 +842,7 @@ class Seq2SeqAttNN(NN):
                 batch_out_tags = []
                 batch_last_tags = []
                 for tmp_in, tmp_out in zip(tmp_in_tags, tmp_out_tags):
-                    # tmp_in = [i-1 for i in tmp_in]
-                    # tmp_out = [i-1 for i in tmp_out]
                     _in = tmp_in[-1]
-                    # _out = int(np.mean(tmp_out))
                     _out = tmp_out[0]
                     batch_last_tags.append(_in)
                     batch_in_tags.append(tmp_in)
@@ -997,27 +857,15 @@ class Seq2SeqAttNN(NN):
                     self.lab_input_tag: batch_out_tags
                 }
                 self.batch_size_ = len(batch_in)
-                # train
                 preds, loss = sess.run(
                     [self.softmax_input, self.loss],
                     feed_dict=feed_dict
                 )
-                # graph = sess.run(merged,feed_dict=feed_dict)
-                # writer.add_summary(graph,batch)
                 t_r, t_m, ranks = cau_recall_mrr_org_list(preds, batch_out, cutoff=self.cut_off)
-                # test_data.pack_ext_matrix('alpha', alpha, tmp_batch_ids)
                 test_data.pack_preds(ranks, tmp_batch_ids)
-                # tf.summary.scalar("test_loss",loss)
-                # writer.add_summary(graph,batch)
                 c_loss += list(loss)
-                # recall += t_r
-                # mrr += t_m
                 for k in range(len(self.cut_off)):
                     recall[k] += t_r[k]
                     mrr[k] += t_m[k]
                 batch += 1
-        # for k in range(len(self.cut_off)):
-        #     r, m =cau_samples_recall_mrr(test_data.samples,self.cut_off[k])
-        #     print (r,m)
-        # print (np.mean(c_loss))
         return  np.mean(recall,axis=1), np.mean(mrr,axis=1)
