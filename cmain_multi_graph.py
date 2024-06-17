@@ -22,16 +22,9 @@ ml_1m_train = 'ml-1m/ml-1m-train_0.txt'
 ml_1m_test = 'ml-1m-test_0.txt'
 
 def load_tt_datas(config={}, reload=True):
-    '''
-    loda data.
-    config: 获得需要加载的数据类型，放入pre_embedding.
-    nload: 是否重新解析原始数据
-    '''
-
     if reload:
         print( "reload the datasets.")
         print (config['dataset'])
-                #    kuairand_test,
         if config['dataset'] == 'kuairand':
             train_data, test_data, item2idx, n_items,max_num,item2tag,max_tag_num = load_data_k(
                 kuairand_train,
@@ -45,8 +38,6 @@ def load_tt_datas(config={}, reload=True):
             config['pre_embedding_tag'] = emb_dict_tag
             config['item2tag'] = item2tag
             config['item2idx'] = item2idx
-
-            path = 'datas/mid_data'
             print("-----")
         
 
@@ -63,11 +54,6 @@ def load_tt_datas(config={}, reload=True):
             config['pre_embedding_tag'] = emb_dict_tag
             config['item2tag'] = item2tag
             config['item2idx'] = item2idx
-
-            path = 'datas/mid_data'
-
-
-
     else:
         print ("not reload the datasets.")
         print(config['dataset'])
@@ -79,16 +65,12 @@ def load_tt_datas(config={}, reload=True):
             )
             config["n_items"] = n_items-1
             emb_dict_id = load_random(item2idx,edim=config['hidden_size'], init_std=config['emb_stddev'])     
-            # emb_dict_tag  = load_random(item2tag,edim=config['hidden_size'], init_std=config['emb_stddev'])
             emb_dict_tag = load_random_k(max_tag_num,edim=config['hidden_size'], init_std=config['emb_stddev'])
 
             config['pre_embedding_id'] = emb_dict_id
             config['pre_embedding_tag'] = emb_dict_tag
             config['item2idx'] = item2idx
-
             config['item2tag'] = item2tag
-
-            path = 'datas/mid_data'
             print("-----")
 
         if config['dataset'] == 'ml_1m':
@@ -112,10 +94,6 @@ def load_tt_datas(config={}, reload=True):
 
 
 def load_conf(model, modelconf):
-    '''
-    model: 需要加载的模型
-    modelconf: model config文件所在的路径
-    '''
     # load model config
     model_conf = read_conf(model, modelconf)
     if model_conf is None:
@@ -133,7 +111,6 @@ def load_conf(model, modelconf):
     param_conf = read_conf(model, paramconf)
     return module, obj, param_conf
 
-
 def option_parse():
     '''
     parse the option.
@@ -145,7 +122,7 @@ def option_parse():
         action='store',
         type='string',
         dest="model",
-        default='stand_ml_1m'
+        default='t2diff_ml_1m'
     )
     parser.add_option(
         "-d",
@@ -163,27 +140,11 @@ def option_parse():
         default=False
     )
     parser.add_option(
-        "-c",
-        "--classnum",
-        action='store',
-        type='int',
-        dest="classnum",
-        default=2
-    )
-
-    parser.add_option(
         "-a",
         "--nottrain",
         action='store_true',
         dest="not_train",
         default=False
-    )
-    parser.add_option(
-        "-n",
-        "--notsavemodel",
-        action='store_true',
-        dest="not_save_model",
-        default=True
     )
     parser.add_option(
         "-p",
@@ -194,64 +155,41 @@ def option_parse():
         default='./save_model'
     )
     parser.add_option(
-        "-i",
-        "--inputdata",
-        action='store',
-        type='string',
-        dest="input_data",
-        default='test'
-    )
-    parser.add_option(
         "-e",
         "--epoch",
         action='store',
         type='int',
         dest="epoch",
-        default=1
+        default=10
     )
     (option, args) = parser.parse_args()
     return option
 
 
 def main(options, modelconf="config/model.conf"):
-    '''
-    model: 需要加载的模型
-    dataset: 需要加载的数据集
-    reload: 是否需要重新加载数据，yes or no
-    modelconf: model config文件所在的路径
-    class_num: 分类的类别
-    use_term: 是否是对aspect term 进行分类
-    '''
     model = options.model
     dataset = options.dataset
     reload = options.reload
-    class_num = options.classnum
     is_train = not options.not_train
-    is_save = not options.not_save_model
     model_path = options.model_path
-    input_data = options.input_data
-    epoch = options.epoch
 
     module, obj, config = load_conf(model, modelconf)
     config['model'] = model
     print(model)
-    config['dataset'] = dataset
-    config['class_num'] = class_num
-    config['nepoch'] = epoch
+    dataset = config['dataset']
+    epoch = config['nepoch']
+    cut_off = config["cut_off"]
     train_data, test_data = load_tt_datas(config, reload)
     module = __import__(module, fromlist=True)
 
-    train_model_save_path = 'save_model/stamp_new/save3/ml_1m.ckpt-kuairand'
+    train_model_save_path = model_path
 
     # setup randomer
 
     Randomer.set_stddev(config['stddev'])
-    # 只有测试的话只测试一次
     if not is_train and test_data!=None:
         max_recall = []
         max_mrr = []
-        cut_off = [1,2,5,20,50]
-        # cut_off = [5,10,50,100,200]
         epoch_num = 0
         for i in range(len(cut_off)):
             max_recall.append(0.0)
@@ -278,14 +216,12 @@ def main(options, modelconf="config/model.conf"):
                         max_mrr[i] = mrr[i]
                         test_data.update_best()
                         increase_num+=1
-                        epoch_num = 0
-                    if max_recall[i] > config['kuairand_threshold_acc']:
-                        model.save_model(test_sess, config, saver)    
+                        epoch_num = 0  
                     print ("max_recall@{}: ".format(str(cut_off[i])) + str(max_recall[i])+" max_mrr@{}: ".format(str(cut_off[i]))+str(max_mrr[i]))
                 if increase_num==0:
                     epoch_num += 1
                 if epoch_num==3:
-                    print("长时间指标未增长，训练结束")
+                    print("Early stop")
                     sys.exit(0)    
                 test_data.flush()
     else:
@@ -327,18 +263,18 @@ def main(options, modelconf="config/model.conf"):
             writer = tf.summary.FileWriter(log_path, train_sess.graph)
             max_recall = []
             max_mrr = []
-            cut_off = [1,2,5,20,50]
             epoch_num = 0
             for i in range(len(cut_off)):
                 max_recall.append(0.0)
                 max_mrr.append(0.0)
             for e in range(epoch):
                 if is_train:
+                    start = time.time()
                     if dataset == 'kuairand' or dataset == 'ml_1m':
                         train_model.train(train_sess,e, train_data, merged, writer)
                     else:
                         train_model.train(train_sess, train_data, test_data)
-                    print('训练时间',time.time()-start)
+                    print('Train time cost',time.time()-start)
                     train_saver = tf.train.Saver()  
                     train_saver.save(train_sess, train_model_save_path)
                 if test_data != None:
@@ -349,7 +285,7 @@ def main(options, modelconf="config/model.conf"):
                         sent_data = test_data
                         start = time.time()
                         recall, mrr = test_model.test(test_sess, sent_data)
-                        print('测试时间',time.time()-start)
+                        print('Test time cost',time.time()-start)
                         print(recall, mrr)
                         increase_num = 0
                         for i in range(len(max_recall)):
@@ -367,6 +303,7 @@ def main(options, modelconf="config/model.conf"):
                         if increase_num==0:
                             epoch_num += 1
                         if epoch_num==5:
+                            print("Early stop")
                             sys.exit(0)    
                         test_data.flush()
 

@@ -43,11 +43,8 @@ class T2diff(NN):
                 self.pre_tag.append(self.item2tag[i])
 
             self.emb_up = config['emb_up']
-            # the active function.
-            self.active = config['active']
             # hidden size
             self.hidden_size = config['hidden_size']
-            self.is_print = config['is_print']
             self.cut_off = config["cut_off"]
         
         self.batch_size_ = None
