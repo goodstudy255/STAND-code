@@ -5,7 +5,6 @@ import math
 import random
 import json
 from collections import defaultdict
-from data_prepare.entity.sample import Sample
 from data_prepare.entity.sample_kuairand import Sample_kuairand
 from data_prepare.entity.samplepack import Samplepack
 
