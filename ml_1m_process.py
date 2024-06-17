@@ -4,7 +4,7 @@ from collections import defaultdict
 import json
 import pandas as pd
 
-# ml_1m_data_path = '/Users/hanzhexin/Desktop/STAMP/ml-1m/ratings.dat'
+# ml_1m_data_path = 'ml-1m/ratings.dat'
 
 # user_seq = defaultdict(list)
 # item_seq = defaultdict(set)
@@ -17,7 +17,7 @@ import pandas as pd
 #         user_seq[usr_id].append(movie_id)
 #         item_seq[movie_id].add(usr_id)
 
-# cate_path = '/Users/hanzhexin/Desktop/STAMP/ml-1m/movies.dat'
+# cate_path = 'ml-1m/movies.dat'
 
 # cate_dict = {}
 # item2cate = {}
