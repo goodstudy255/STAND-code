@@ -5,7 +5,7 @@ import math
 import random
 import json
 from collections import defaultdict
-from data_prepare.entity.sample_kuairand import Sample_kuairand
+from data_prepare.entity.sample import Sample
 from data_prepare.entity.samplepack import Samplepack
 
 
@@ -81,7 +81,7 @@ def _load_data(file_path, item2idx, item2tag,idx_cnt,  tag_num, users,interactio
     samples = []
     now_id = 0
     print("I am reading")
-    sample = Sample_kuairand()
+    sample = Sample()
     last_id = None
     click_items = []
 
@@ -129,7 +129,7 @@ def _load_data(file_path, item2idx, item2tag,idx_cnt,  tag_num, users,interactio
         sample.click_items = np.append(data[1],data[2])
         samples.append(sample)
         now_id+=1
-        sample = Sample_kuairand()
+        sample = Sample()
 
     print(len(samples))
     samplepack.samples = samples

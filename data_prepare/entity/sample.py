@@ -1,6 +1,6 @@
 #coding=utf-8
 
-class Sample_kuairand(object):
+class Sample(object):
     '''
     一个样本。
     '''
