@@ -9,9 +9,6 @@ import sys
 import math
 
 class T2diff(NN):
-    """
-    The memory network with context attention.
-    """
     def __init__(self, config):
         super(T2diff, self).__init__(config)
         self.config = None
@@ -154,7 +151,7 @@ class T2diff(NN):
 
             return outputs
     
-    def transformer(self,inputs, inputs_action_len, atten_unit=16, head_num=4, scope_name="transformer", debug_name=""):
+    def transformer(self,inputs, inputs_action_len, atten_unit=16, head_num=4, scope_name="transformer"):
         """
         inputs: user action list, (batch_size x max_action_length x action_dim)
         return concat(inputs, context_info)
@@ -322,9 +319,9 @@ class T2diff(NN):
         lab_input_emb = tf.expand_dims(lab_input_emb,1)
 
         extended_input = tf.concat([inputs, lab_input_emb], axis=1)
-        KL_loss, predicted_next = self.diffusion(extended_input[:, : -1, :], extended_input[:, 1: , :], 1)
+        KL_loss, predicted_next = self.diffusion(extended_input[:, : -1, :], extended_input[:, 1: , :], 1) # predict next
         
-        session_inputs = tf.concat([extended_input[:, -11:-1, :], predicted_next], axis=1)
+        session_inputs = tf.concat([extended_input[:, -11:-1, :], predicted_next], axis=1) # current session
         history_play_actual_lens = tf.cast(tf.reduce_sum(tf.sign(tf.reduce_max(tf.abs(session_inputs), axis=2, keepdims=True)), axis=1, keepdims=True), tf.float32) # zero-mask
         session_outputs = self.transformer(session_inputs, history_play_actual_lens, atten_unit=self.edim//2, head_num=2)
         session_outputs = tf.math.reduce_mean(session_outputs, 1, True)
@@ -434,9 +431,9 @@ class T2diff(NN):
 
 
         extended_input = tf.concat([inputs, lab_input_emb], axis=1)
-        KL_loss, predicted_next = self.diffusion(extended_input[:, : -1, :], extended_input[:, 1: , :], 0)
-        session_inputs = tf.concat([extended_input[:, -11: -1, :], predicted_next], axis=1)
-        history_play_actual_lens = tf.cast(tf.reduce_sum(tf.sign(tf.reduce_max(tf.abs(session_inputs), axis=2, keepdims=True)), axis=1, keepdims=True), tf.float32)
+        KL_loss, predicted_next = self.diffusion(extended_input[:, : -1, :], extended_input[:, 1: , :], 0) # predict next
+        session_inputs = tf.concat([extended_input[:, -11: -1, :], predicted_next], axis=1) # current session
+        history_play_actual_lens = tf.cast(tf.reduce_sum(tf.sign(tf.reduce_max(tf.abs(session_inputs), axis=2, keepdims=True)), axis=1, keepdims=True), tf.float32) # zero-mask
         session_outputs = self.transformer(session_inputs, history_play_actual_lens, atten_unit=self.edim//2, head_num=2)
         session_outputs = tf.math.reduce_mean(session_outputs, 1, True)
 
@@ -457,7 +454,7 @@ class T2diff(NN):
             tf.summary.scalar("loss",loss)
         self.softmax_input = sco_mat
     
-    def train(self,sess, epoch, train_data, merged=None, writer=None, threshold_acc=0.99):   
+    def train(self,sess, epoch, train_data, merged=None, writer=None):   
         batch = 0
         c = []
         c_kl = []

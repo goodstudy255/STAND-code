@@ -336,9 +336,9 @@ def main(options, modelconf="config/model.conf"):
             for e in range(epoch):
                 if is_train:
                     if dataset == 'kuairand' or dataset == 'ml_1m':
-                        train_model.train(train_sess,e, train_data, merged, writer,  threshold_acc=config['kuairand_threshold_acc'])
+                        train_model.train(train_sess,e, train_data, merged, writer)
                     else:
-                        train_model.train(train_sess, train_data, test_data, threshold_acc=config['recsys_threshold_acc'])
+                        train_model.train(train_sess, train_data, test_data)
                     print('训练时间',time.time()-start)
                     train_saver = tf.train.Saver()  
                     train_saver.save(train_sess, train_model_save_path)
@@ -363,9 +363,7 @@ def main(options, modelconf="config/model.conf"):
                                 max_mrr[i] = mrr[i]
                                 test_data.update_best()
                                 increase_num+=1
-                                epoch_num = 0
-                            if max_recall[i] > config['kuairand_threshold_acc']:
-                                test_model.save_model(test_sess, config, test_saver)    
+                                epoch_num = 0   
                             print ("max_recall@{}: ".format(str(cut_off[i])) + str(max_recall[i])+" max_mrr@{}: ".format(str(cut_off[i]))+str(max_mrr[i]))
                         if increase_num==0:
                             epoch_num += 1
