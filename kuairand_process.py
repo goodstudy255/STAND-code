@@ -190,7 +190,6 @@ def run(part_id, total_part_num):
 
                 f_train.write("%s\t%s\t%s\t%s\t%s\t%s\n" % (uid, curr_seq_str, seq[i], tag, neg, hard_neg))
 
-        # /kuairand_test_new
     num_per_usr = 1
     with open('./kuairand-test_%d.txt' % part_id, 'w+') as f_test:    
         test_users = list(user_test.keys())
