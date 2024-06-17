@@ -15,8 +15,8 @@ import os
 kuairand_train = 'kuairand/kuairand-train_0.txt'
 kuairand_test = 'kuairand/kuairand-test_0.txt'
 
-ml_1m_train = 'ml-1m/ml-1m-train_0.txt'
-ml_1m_test = 'ml-1m/ml-1m-test_0.txt'
+ml_1m_train = 'ml_1m/ml-1m-train_0.txt'
+ml_1m_test = 'ml_1m/ml-1m-test_0.txt'
 
 def load_tt_datas(config={}, reload=True):
     if reload:
@@ -166,7 +166,6 @@ def main(options, modelconf="config/model.conf"):
     reload = options.reload
     is_train = not options.not_train
     model_path = options.model_path
-    print(model_path)
 
     module, obj, config = load_conf(model, modelconf)
     config['model'] = model

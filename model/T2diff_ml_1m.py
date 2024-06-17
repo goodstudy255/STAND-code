@@ -45,11 +45,8 @@ class T2diff(NN):
                 self.pre_tag.append(self.item2tag[i])
 
             self.emb_up = config['emb_up']
-            # the active function.
-            self.active = config['active']
             # hidden size
             self.hidden_size = config['hidden_size']
-            self.is_print = config['is_print']
             self.cut_off = config["cut_off"]
         
         self.batch_size_ = None
@@ -150,7 +147,7 @@ class T2diff(NN):
             outputs = x
             return outputs
     
-    def self_attention(self,inputs, inputs_action_len, atten_unit=16, head_num=4, scope_name="self_attention", debug_name=""):
+    def transformer(self,inputs, inputs_action_len, atten_unit=16, head_num=4, scope_name="transformer", debug_name=""):
         """
         inputs: user action list, (batch_size x max_action_length x action_dim)
         return concat(inputs, context_info)
@@ -198,7 +195,7 @@ class T2diff(NN):
             step_weight = 1e-2
             step_embs = [[math.sin(t/2**f) for f in range(hidden_dim*2)] for t in range(1, total_steps+1)]
             
-            if is_train==1:
+            if is_train==1: # training process
                 t = tf.random.uniform(shape=[tf.shape(inputs)[0]], minval=0, maxval=total_steps, dtype=tf.int32)
                 diff = input_with_target - inputs
 
@@ -219,7 +216,7 @@ class T2diff(NN):
 
                 predicted_next = (inputs + reconstructed_t)[:, -1:, :] 
             else:
-                # test graph
+                # inference process
                 KL_loss = None
                 infer_steps = total_steps
                 gaussian_noise_diffu = tf.random.normal(shape=tf.shape(inputs), mean=0, stddev=1)
@@ -239,10 +236,6 @@ class T2diff(NN):
         return KL_loss, predicted_next
 
     def build_train_model(self):
-        '''
-        build the MemNN model
-        '''       
-        
         self.inputs = tf.placeholder(
             tf.int32,
             [None,None],
@@ -310,6 +303,7 @@ class T2diff(NN):
             self.embe_dict_tag *= self.pe_mask_tag
 
         print_ops = []
+        head_num = 2
         
         inputs_id = tf.nn.embedding_lookup(self.embe_dict, self.inputs,max_norm=1.5)
         inputs_tag = tf.reshape(self.inputs_tags,[-1,tf.shape(self.inputs_tags)[-1]])
@@ -323,25 +317,21 @@ class T2diff(NN):
 
         extended_input = tf.concat([inputs, lab_input_emb], axis=1)
         KL_loss, predicted_next = self.diffusion(extended_input[:, : -1, :], extended_input[:, 1: , :], 1)
-        predicted_next = tf.squeeze(predicted_next,1)
-
-        lab_input_emb = tf.nn.embedding_lookup(self.embe_dict,self.lab_input,max_norm=1.5)
-        lab_input_tag_emb = tf.reshape(self.lab_input_tag,[-1,tf.shape(self.lab_input_tag)[-1]])
-        lab_input_tag_emb = tf.matmul(lab_input_tag_emb,self.embe_dict_tag)
-        lab_input_tag_emb = tf.reshape(lab_input_tag_emb,[tf.shape(self.lab_input_tag)[0],2])/tf.reduce_sum(self.lab_input_tag,axis=-1,keepdims=True) 
-        lab_input_emb = tf.concat((lab_input_emb,lab_input_tag_emb),axis=-1)
-        dot_res = tf.reduce_sum(tf.matmul(lab_input_emb,predicted_next,transpose_b=True),axis=-1)
-        len_res = tf.norm(lab_input_emb,ord = 2)* tf.norm(predicted_next,ord = 2)
-        similarity = tf.reduce_mean(dot_res/len_res)
-
-        session_inputs = extended_input[:, : -1, :]
+        session_inputs = tf.concat([extended_input[:, -11:-1, :], predicted_next], axis=1)
         history_play_actual_lens = tf.cast(tf.reduce_sum(tf.sign(tf.reduce_max(tf.abs(session_inputs), axis=2, keepdims=True)), axis=1, keepdims=True), tf.float32)
-        session_inputs = self.self_attention(session_inputs, history_play_actual_lens, atten_unit=2, head_num=2)
-        din_out = session_inputs[:, -1, :]
+        session_inputs = self.transformer(session_inputs, history_play_actual_lens, atten_unit=self.edim/head_num, head_num=head_num)
+        session_inputs = tf.math.reduce_mean(session_inputs, 1, True)
+
+        din_out  = self.target_attention(session_inputs, extended_input[:, :-11, ])
+        
+        session_inputs = tf.squeeze(session_inputs,axis=1)
+
+        din_out = tf.concat((din_out,session_inputs),axis = -1)
 
         self.pre_tag = tf.cast(self.pre_tag,tf.float32)
         embe_dict_all_tag = tf.matmul(self.pre_tag[1:],self.embe_dict_tag)/tf.reduce_sum(self.pre_tag[1:],axis=-1,keepdims=True)  
         self.embe_new_dict= tf.concat((self.embe_dict[2:],embe_dict_all_tag),axis=-1)
+        self.embe_new_dict = self.simple_dnn(self.embe_new_dict, sub_name="mlp", hidden_units=[2*self.edim]) 
         sco_mat = tf.matmul(din_out,self.embe_new_dict,transpose_b= True)
         
         with tf.control_dependencies(print_ops):   
@@ -361,10 +351,6 @@ class T2diff(NN):
                 self.loss, self.params)
     
     def build_test_model(self):
-        '''
-        build the MemNN model
-        '''
-        
         self.inputs = tf.placeholder(
             tf.int32,
             [None,None],
@@ -439,26 +425,19 @@ class T2diff(NN):
         lab_input_emb = tf.expand_dims(self.lab_input_emb,1)
 
         extended_input = tf.concat([inputs, lab_input_emb], axis=1)
-        
         KL_loss, predicted_next = self.diffusion(extended_input[:, : -1, :], extended_input[:, 1: , :], 0)
-
-        lab_input_emb = tf.nn.embedding_lookup(self.embe_dict,self.lab_input,max_norm=1.5)
-        lab_input_tag_emb = tf.reshape(self.lab_input_tag,[-1,tf.shape(self.lab_input_tag)[-1]])
-        lab_input_tag_emb = tf.matmul(lab_input_tag_emb,self.embe_dict_tag)
-        lab_input_tag_emb = tf.reshape(lab_input_tag_emb,[tf.shape(self.lab_input_tag)[0],2])/tf.reduce_sum(self.lab_input_tag,axis=-1,keepdims=True) 
-        lab_input_emb = tf.concat((lab_input_emb,lab_input_tag_emb),axis=-1)
-        lab_input_emb = tf.expand_dims(lab_input_emb,axis=1)
-
-        session_inputs = tf.concat([extended_input[:, : -1, :], lab_input_emb], axis=1)
+        session_inputs = tf.concat([extended_input[:, -11:-1, :], predicted_next], axis=1)
         history_play_actual_lens = tf.cast(tf.reduce_sum(tf.sign(tf.reduce_max(tf.abs(session_inputs), axis=2, keepdims=True)), axis=1, keepdims=True), tf.float32)
-        session_inputs = self.self_attention(session_inputs, history_play_actual_lens, atten_unit=2, head_num=2)
-
-        din_out = session_inputs[:, -1, :]
+        session_inputs = self.transformer(session_inputs, history_play_actual_lens, atten_unit=2, head_num=2)
+        session_inputs = tf.math.reduce_mean(session_inputs, 1, True)
+        din_out = self.target_attention(session_inputs, extended_input[:, :-11, ])
+        session_inputs = tf.squeeze(session_inputs,axis=1)
+        din_out = tf.concat((din_out,session_inputs),axis = -1)
 
         self.pre_tag = tf.cast(self.pre_tag,tf.float32)
         embe_dict_all_tag = tf.matmul(self.pre_tag[1:],self.embe_dict_tag)/tf.reduce_sum(self.pre_tag[1:],axis=-1,keepdims=True)  
         self.embe_new_dict= tf.concat((self.embe_dict[2:],embe_dict_all_tag),axis=-1)
-
+        self.embe_new_dict = self.simple_dnn(self.embe_new_dict, sub_name="mlp", hidden_units=[2*self.edim]) 
         sco_mat = tf.matmul(din_out,self.embe_new_dict,transpose_b= True)
 
         with tf.name_scope('test_loss'):
@@ -467,7 +446,7 @@ class T2diff(NN):
             tf.summary.scalar("loss",loss)
         self.softmax_input = sco_mat
     
-    def train(self,sess,epoch, train_data,merged=None, writer=None, threshold_acc=0.99):   
+    def train(self,sess,epoch, train_data,merged=None, writer=None):   
         batch = 0
         c = []
         c_kl = []

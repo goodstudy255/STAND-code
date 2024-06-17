@@ -22,8 +22,7 @@ def load_data_m(train_file, test_file,pad_idx = 0):
     items2idx['<pad>'] = pad_idx
     items2idx[0] = 0
 
-
-    path = 'ml-1m/item2cate.json'
+    path = 'ml_1m/item2cate.json'
     item2tag_float = json.load(open(path))
     item2tag = defaultdict()
     item2tag['<pad>'] = pad_idx
