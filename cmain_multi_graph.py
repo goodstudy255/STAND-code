@@ -14,7 +14,6 @@ import time
 import datetime
 import os
 
-# _new
 kuairand_train = 'kuairand/kuairand-train_0.txt'
 kuairand_test = 'kuairand/kuairand-test_0.txt'
 
@@ -59,8 +58,6 @@ def load_tt_datas(config={}, reload=True):
             config['item2idx'] = item2idx
 
             path = 'datas/mid_data'
-
-
 
     else:
         print ("not reload the datasets.")

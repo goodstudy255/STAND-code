@@ -10,7 +10,6 @@ from data_prepare.ml_1m_read_text import load_data_m
 from util.Config import read_conf
 from util.FileDumpLoad import dump_file, load_file
 from util.Randomer import Randomer
-# the data path.
 
 
 kuairand_train = 'kuairand/kuairand-train_0.txt'
@@ -18,8 +17,6 @@ kuairand_test = 'kuairand/kuairand-test_0.txt'
 
 ml_1m_train = 'ml-1m/ml-1m-train_0.txt'
 ml_1m_test = 'ml-1m/ml-1m-test_0.txt'
-
-
 
 def load_tt_datas(config={}, reload=True):
     if reload:
@@ -34,7 +31,6 @@ def load_tt_datas(config={}, reload=True):
 
             emb_dict_id = load_random(item2idx,edim=config['hidden_size'], init_std=config['emb_stddev'])
             emb_dict_tag  = load_random_k(max_tag_num,edim=config['hidden_size'], init_std=config['emb_stddev'])
-
             config['pre_embedding_id'] = emb_dict_id
             config['pre_embedding_tag'] = emb_dict_tag
             config['item2tag'] = item2tag
