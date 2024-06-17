@@ -5,7 +5,6 @@ import math
 import random
 import json
 from collections import defaultdict
-sys.path.append('/Users/hanzhexin/Desktop/snack_model_config/STAMP/')
 from data_prepare.entity.sample import Sample
 from data_prepare.entity.sample_kuairand import Sample_kuairand
 from data_prepare.entity.samplepack import Samplepack
@@ -25,7 +24,7 @@ def load_data_k(train_file, test_file,pad_idx = 0):
     items2idx[0] = 0
 
 
-    path = '/Users/hanzhexin/Desktop/STAMP/kuairand/item2cate.json'
+    path = 'kuairand/item2cate.json'
     item2tag_float = json.load(open(path))
     item2tag = defaultdict()
     item2tag['<pad>'] = pad_idx
@@ -163,11 +162,8 @@ def _load_data(file_path, item2idx, item2tag,idx_cnt,max_num, users,interactions
 
 
 if __name__ == '__main__':
-    a=1
-    # file_path = '/Users/hanzhexin/Desktop/snack_model_config/STAMP/kuairand-data/kuairand-train_0.txt'
-    # a = _load_data(file_path,{},0,0)
 
-    path = '/Users/hanzhexin/Desktop/snack_model_config/STAMP/kuairand/item2cate.json'
+    path = 'kuairand/item2cate.json'
     item2tag = json.load(open(path))
     a = defaultdict()
     for item in item2tag:
