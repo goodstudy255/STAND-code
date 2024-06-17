@@ -233,7 +233,7 @@ class Seq2SeqAttNN(NN):
             inputs = tf.stop_gradient(inputs)
             input_with_target = tf.stop_gradient(input_with_target)
             a, b = 1e-2, 4.5
-            alphas, betas, alpha_hats, beta_hats = [], [], [], [] # 控制加噪声的大小，beta越大噪声越大
+            alphas, betas, alpha_hats, beta_hats = [], [], [], []
             for s in range(1, total_steps+1):
                 beta = a*math.exp(b*s/total_steps) #exponential schedule
                 betas.append(beta)
