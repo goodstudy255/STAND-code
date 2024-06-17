@@ -22,16 +22,10 @@ ml_1m_train = 'ml-1m/ml-1m-train_0.txt'
 ml_1m_test = 'ml-1m-test_0.txt'
 
 def load_tt_datas(config={}, reload=True):
-    '''
-    loda data.
-    config: 获得需要加载的数据类型，放入pre_embedding.
-    nload: 是否重新解析原始数据
-    '''
 
     if reload:
         print( "reload the datasets.")
         print (config['dataset'])
-                #    kuairand_test,
         if config['dataset'] == 'kuairand':
             train_data, test_data, item2idx, n_items,max_num,item2tag,max_tag_num = load_data_k(
                 kuairand_train,
@@ -79,7 +73,6 @@ def load_tt_datas(config={}, reload=True):
             )
             config["n_items"] = n_items-1
             emb_dict_id = load_random(item2idx,edim=config['hidden_size'], init_std=config['emb_stddev'])     
-            # emb_dict_tag  = load_random(item2tag,edim=config['hidden_size'], init_std=config['emb_stddev'])
             emb_dict_tag = load_random_k(max_tag_num,edim=config['hidden_size'], init_std=config['emb_stddev'])
 
             config['pre_embedding_id'] = emb_dict_id
@@ -112,11 +105,6 @@ def load_tt_datas(config={}, reload=True):
 
 
 def load_conf(model, modelconf):
-    '''
-    model: 需要加载的模型
-    modelconf: model config文件所在的路径
-    '''
-    # load model config
     model_conf = read_conf(model, modelconf)
     if model_conf is None:
         raise Exception("wrong model config path.", model_conf)
@@ -129,7 +117,6 @@ def load_conf(model, modelconf):
     for line in params[:-1]:
         paramconf += line + "/"
     paramconf = paramconf[:-1]
-    # load super params.
     param_conf = read_conf(model, paramconf)
     return module, obj, param_conf
 
@@ -214,14 +201,6 @@ def option_parse():
 
 
 def main(options, modelconf="config/model.conf"):
-    '''
-    model: 需要加载的模型
-    dataset: 需要加载的数据集
-    reload: 是否需要重新加载数据，yes or no
-    modelconf: model config文件所在的路径
-    class_num: 分类的类别
-    use_term: 是否是对aspect term 进行分类
-    '''
     model = options.model
     dataset = options.dataset
     reload = options.reload
@@ -246,12 +225,10 @@ def main(options, modelconf="config/model.conf"):
     # setup randomer
 
     Randomer.set_stddev(config['stddev'])
-    # 只有测试的话只测试一次
     if not is_train and test_data!=None:
         max_recall = []
         max_mrr = []
         cut_off = [1,2,5,20,50]
-        # cut_off = [5,10,50,100,200]
         epoch_num = 0
         for i in range(len(cut_off)):
             max_recall.append(0.0)
@@ -285,7 +262,6 @@ def main(options, modelconf="config/model.conf"):
                 if increase_num==0:
                     epoch_num += 1
                 if epoch_num==3:
-                    print("长时间指标未增长，训练结束")
                     sys.exit(0)    
                 test_data.flush()
     else:
@@ -338,7 +314,6 @@ def main(options, modelconf="config/model.conf"):
                         train_model.train(train_sess,e, train_data, merged, writer)
                     else:
                         train_model.train(train_sess, train_data, test_data)
-                    print('训练时间',time.time()-start)
                     train_saver = tf.train.Saver()  
                     train_saver.save(train_sess, train_model_save_path)
                 if test_data != None:
@@ -349,7 +324,6 @@ def main(options, modelconf="config/model.conf"):
                         sent_data = test_data
                         start = time.time()
                         recall, mrr = test_model.test(test_sess, sent_data)
-                        print('测试时间',time.time()-start)
                         print(recall, mrr)
                         increase_num = 0
                         for i in range(len(max_recall)):

@@ -22,40 +22,23 @@ ml_1m_test = 'ml-1m/ml-1m-test_0.txt'
 
 
 def load_tt_datas(config={}, reload=True):
-    '''
-    loda data.
-    config: 获得需要加载的数据类型，放入pre_embedding.
-    nload: 是否重新解析原始数据
-    '''
-
     if reload:
         print( "reload the datasets.")
         print (config['dataset'])
-                #    kuairand_test,
         if config['dataset'] == 'kuairand':
             train_data, test_data, item2idx, n_items,max_num,item2tag,max_tag_num = load_data_k(
                 kuairand_train,
                 kuairand_test
             )
             config["n_items"] = n_items-1
-            # emb_dict = load_random(item2idx,edim=config['hidden_size'], init_std=config['emb_stddev'])
 
             emb_dict_id = load_random(item2idx,edim=config['hidden_size'], init_std=config['emb_stddev'])
-            # emb_dict_tag,emb_dict_tag2id = load_random_tag(max_tag_num,max_num,item2idx,item2tag,edim=config['hidden_size'], init_std=config['emb_stddev'])
             emb_dict_tag  = load_random_k(max_tag_num,edim=config['hidden_size'], init_std=config['emb_stddev'])
-            # emb_dict_duration_time = load_random(items2duration,edim=config['hidden_size'], init_std=config['emb_stddev'])
-            # emb_dict_play_time = load_random(items2play,edim=config['hidden_size'], init_std=config['emb_stddev'])
-
-            # config['pre_embedding'] = emb_dict
 
             config['pre_embedding_id'] = emb_dict_id
             config['pre_embedding_tag'] = emb_dict_tag
             config['item2tag'] = item2tag
             config['item2idx'] = item2idx
-            # config['max_num'] = max_num
-            # config['pre_embedding_tag2id'] = emb_dict_tag2id
-            # config['pre_embedding_duration_time'] = emb_dict_duration_time
-            # config['pre_embedding_play_time'] = emb_dict_play_time
 
             path = 'datas/mid_data'
             print("-----")
@@ -86,25 +69,14 @@ def load_tt_datas(config={}, reload=True):
                 kuairand_test
             )
             config["n_items"] = n_items-1
-            # emb_dict = load_random(item2idx,edim=config['hidden_size'], init_std=config['emb_stddev'])
-            # config['pre_embedding'] = emb_dict
 
             emb_dict_id = load_random(item2idx,edim=config['hidden_size'], init_std=config['emb_stddev'])
-            # emb_dict_tag,emb_dict_tag2id = load_random_tag(max_tag_num,max_num,item2idx,item2tag,edim=config['hidden_size'], init_std=config['emb_stddev'])
             emb_dict_tag  = load_random_k(max_tag_num,edim=config['hidden_size'], init_std=config['emb_stddev'])
 
-
-            # emb_dict_duration_time = load_random(items2duration,edim=config['hidden_size'], init_std=config['emb_stddev'])
-            # emb_dict_play_time = load_random(items2play,edim=config['hidden_size'], init_std=config['emb_stddev'])
-
-            # config['pre_embedding_tag2id'] = emb_dict_tag2id
             config['pre_embedding_id'] = emb_dict_id
             config['pre_embedding_tag'] = emb_dict_tag
             config['item2idx'] = item2idx
-            # config['max_num'] = max_num
             config['item2tag'] = item2tag
-            # config['pre_embedding_duration_time'] = emb_dict_duration_time
-            # config['pre_embedding_play_time'] = emb_dict_play_time
 
             path = 'datas/mid_data'
             print("-----")
@@ -128,10 +100,6 @@ def load_tt_datas(config={}, reload=True):
 
 
 def load_conf(model, modelconf):
-    '''
-    model: 需要加载的模型
-    modelconf: model config文件所在的路径
-    '''
     # load model config
     model_conf = read_conf(model, modelconf)
     if model_conf is None:
@@ -145,7 +113,6 @@ def load_conf(model, modelconf):
     for line in params[:-1]:
         paramconf += line + "/"
     paramconf = paramconf[:-1]
-    # load super params.
     param_conf = read_conf(model, paramconf)
     return module, obj, param_conf
 
@@ -230,14 +197,6 @@ def option_parse():
 
 
 def main(options, modelconf="config/model.conf"):
-    '''
-    model: 需要加载的模型
-    dataset: 需要加载的数据集
-    reload: 是否需要重新加载数据，yes or no
-    modelconf: model config文件所在的路径
-    class_num: 分类的类别
-    use_term: 是否是对aspect term 进行分类
-    '''
     model = options.model
     dataset = options.dataset
     reload = options.reload
@@ -266,7 +225,7 @@ def main(options, modelconf="config/model.conf"):
         model = getattr(module, obj)(config)
         model.build_model()
         if is_save or not is_train:
-            saver = tf.train.Saver() #max_to_keep=30
+            saver = tf.train.Saver()
         else:
             saver = None
         # run
@@ -277,17 +236,16 @@ def main(options, modelconf="config/model.conf"):
             Trainable_params = 0
             NonTrainable_params = 0
 
-            # 遍历tf.global_variables()返回的全局变量列表
             for var in tf.global_variables():
-                shape = var.shape # 获取每个变量的shape，其类型为'tensorflow.python.framework.tensor_shape.TensorShape'
-                array = np.asarray([dim.value for dim in shape]) # 转换为numpy数组，方便后续计算
-                mulValue = np.prod(array) # 使用numpy prod接口计算数组所有元素之积
+                shape = var.shape 
+                array = np.asarray([dim.value for dim in shape]) 
+                mulValue = np.prod(array) 
 
-                Total_params += mulValue # 总参数量
+                Total_params += mulValue
                 if var.trainable:
-                    Trainable_params += mulValue # 可训练参数量
+                    Trainable_params += mulValue 
                 else:
-                    NonTrainable_params += mulValue # 非可训练参数量
+                    NonTrainable_params += mulValue 
 
             print(f'Total params: {Total_params}')
             print(f'Trainable params: {Trainable_params}')
@@ -303,8 +261,6 @@ def main(options, modelconf="config/model.conf"):
                     saver.save(sess, model_path)
                 else:
                     model.train(sess, train_data, test_data, saver, threshold_acc=config['recsys_threshold_acc'])
-                # if dataset == "rsc15":
-                #     model.train(sess, train_data, test_data, saver, threshold_acc=config['recsys_threshold_acc'])
 
             else:
                 if input_data is "test":
