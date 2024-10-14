@@ -2,7 +2,7 @@
 ---
 ## Paper code and data
 
-This is the code for the Recsys 2024 underreview paper: [Unleashing the Potential of Two-Tower Models: Diffusion-Based Cross-Interaction for Large-Scale Matching](Paper 161). We have implemented our methods in **Tensorflow**.
+This is the code for the WWW 2025 underreview paper: [Unleashing the Potential of Two-Tower Models: Diffusion-Based Cross-Interaction for Large-Scale Matching](Paper 296). We have implemented our methods in **Tensorflow**.
 
 
 These are two datasets we used in our paper， Kuairand and ml-1m respectively. After download them in the link below, you can correct the path into your own in `kuairand_proess.py` and `ml_1m_process.py` respectively.
